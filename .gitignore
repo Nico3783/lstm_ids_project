@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Data (raw files — never commit datasets)
+data/raw/
+data/interim/
+data/processed/
+data/sample/
+
+# Models (large binary files)
+models/checkpoints/
+models/final/
+models/baselines/
+
+# Reports (auto-generated)
+reports/figures/
+reports/logs/
+reports/metrics/
+reports/tables/
+
+# Outputs
+outputs/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TensorBoard
+runs/
+logs/
+
+# Misc
+pipeline_output.txt
+.matplotlib_cache/
+zSamples/
+
+# Environment
+*.env
+.env

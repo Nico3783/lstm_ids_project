@@ -1,0 +1,64 @@
+<mxfile host="65bd71144e">
+    <diagram id="bajqRWV0A3uLRttcra3p" name="Page-1">
+        <mxGraphModel dx="1660" dy="711" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="600" pageHeight="900" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="LSTM-IDS Model Architecture&#xa;(Chapter 3, Section 3.5.3)" style="text;html=1;strokeColor=none;fillColor=none;align=center;                    fontSize=14;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="15" width="440" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="input" value="&lt;b&gt;Input Layer&lt;/b&gt;&#xa;Shape: (batch, 10, n_features)&#xa;10 timesteps × n_features&#xa;NSL-KDD: n_features = 41" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;                    strokeColor=#6c8ebf;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="60" width="300" height="75" as="geometry"/>
+                </mxCell>
+                <mxCell id="a0" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="input" target="lstm1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="lstm1" value="&lt;b&gt;LSTM Layer 1&lt;/b&gt;&#xa;Units         : 128&#xa;Activation    : tanh&#xa;Recurrent Act : sigmoid&#xa;return_sequences : True&#xa;&#xa;Learns temporal patterns across all 10 timesteps&#xa;Output shape : (batch, 10, 128)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;                    strokeColor=#82b366;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="195" width="400" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="a1" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="lstm1" target="drop1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="drop1" value="&lt;b&gt;Dropout&lt;/b&gt;  rate = 0.2&#xa;Randomly zeros 20% of LSTM outputs during training&#xa;Prevents co-adaptation of neurons (regularisation)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;                    strokeColor=#d6b656;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="355" width="400" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="a2" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="drop1" target="lstm2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="lstm2" value="&lt;b&gt;LSTM Layer 2&lt;/b&gt;&#xa;Units         : 64&#xa;Activation    : tanh&#xa;Recurrent Act : sigmoid&#xa;return_sequences : False&#xa;&#xa;Distils sequence into a fixed-length vector&#xa;Output shape : (batch, 64)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;                    strokeColor=#82b366;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="465" width="400" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="a3" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="lstm2" target="drop2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="drop2" value="&lt;b&gt;Dropout&lt;/b&gt;  rate = 0.2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;                    strokeColor=#d6b656;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="625" width="400" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="a4" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="drop2" target="dense" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="dense" value="&lt;b&gt;Dense Hidden Layer&lt;/b&gt;&#xa;Units         : 32&#xa;Activation    : ReLU&#xa;Regularisation: L2 (λ = 0.001)&#xa;Penalises large weights to prevent overfitting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;                    strokeColor=#d79b00;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="710" width="400" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="a5" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="dense" target="bn" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn" value="&lt;b&gt;Batch Normalisation&lt;/b&gt;&#xa;Normalises activations per mini-batch&#xa;Stabilises training, accelerates convergence" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0a30a;                    strokeColor=#BD7000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="850" width="400" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="a6" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="bn" target="output" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="output" value="&lt;b&gt;Output Layer (Softmax)&lt;/b&gt;&#xa;Units      : n_classes (5 for NSL-KDD)&#xa;Activation : Softmax → probability distribution&#xa;Output: P(Normal), P(DoS), P(Probe), P(R2L), P(U2R)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;                    strokeColor=#b85450;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="965" width="400" height="85" as="geometry"/>
+                </mxCell>
+                <mxCell id="compile" value="&lt;b&gt;Compilation Settings&lt;/b&gt;&#xa;Optimizer : Adam  (lr = 0.001)&#xa;Loss      : Categorical Cross-Entropy&#xa;Metrics   : Accuracy, Precision, Recall&#xa;Max Epochs: 100  |  Batch: 64  |  Early Stop: patience=10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;                    strokeColor=#9673a6;fontSize=10;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="1070" width="400" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="a7" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#9673a6;" parent="1" source="output" target="compile" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

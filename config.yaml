@@ -1,0 +1,318 @@
+
+# config.yaml — Central Configuration
+# Project: Deep Learning IDS Using LSTM
+# Developer: Kayode Timileyin Nicholas
+# Aligned with Chapter 3 (Materials and Methods)
+
+# Project Metadata
+project:
+  name: "Deep Learning Intrusion Detection System Using LSTM"
+  version: "1.0.0"
+  author: "FUTA Cybersecurity Final Year Project"
+  institution: "Federal University of Technology, Akure"
+  seed: 42  # Global random seed for reproducibility
+
+# Dataset Configuration
+# Chapter 3, Section 3.3.1 — Three benchmark datasets
+dataset:
+  # Primary dataset for first implementation (Chapter 3)
+  active: "nsl_kdd"   # options: nsl_kdd | cicids2017 | unsw_nb15
+
+  nsl_kdd:
+    train_file: "data/raw/nsl_kdd/KDDTrain+.txt"
+    test_file: "data/raw/nsl_kdd/KDDTest+.txt"
+    train_20pct_file: "data/raw/nsl_kdd/KDDTrain+_20Percent.txt"
+    field_names_file: "data/raw/nsl_kdd/field_names.csv"
+    # 41 numerical features after one-hot encoding (Chapter 3, Section 3.5.3)
+    n_features: 41
+    # Label mapping: Chapter 3, Section 3.5.2
+    # 0 = Normal, 1 = DoS, 2 = Probe, 3 = R2L, 4 = U2R
+    label_mapping:
+      normal: 0
+      dos: 1
+      probe: 2
+      r2l: 3
+      u2r: 4
+    # Raw attack-type to category mapping
+    attack_categories:
+      normal: normal
+      back: dos
+      land: dos
+      neptune: dos
+      pod: dos
+      smurf: dos
+      teardrop: dos
+      apache2: dos
+      mailbomb: dos
+      processtable: dos
+      udpstorm: dos
+      ipsweep: probe
+      nmap: probe
+      portsweep: probe
+      satan: probe
+      mscan: probe
+      saint: probe
+      ftp_write: r2l
+      guess_passwd: r2l
+      imap: r2l
+      multihop: r2l
+      phf: r2l
+      spy: r2l
+      warezclient: r2l
+      warezmaster: r2l
+      sendmail: r2l
+      named: r2l
+      snmpgetattack: r2l
+      snmpguess: r2l
+      xlock: r2l
+      xsnoop: r2l
+      httptunnel: r2l
+      buffer_overflow: u2r
+      loadmodule: u2r
+      perl: u2r
+      rootkit: u2r
+      ps: u2r
+      sqlattack: u2r
+      xterm: u2r
+      worm: u2r
+    # Categorical columns requiring one-hot encoding
+    categorical_features:
+      - protocol_type
+      - service
+      - flag
+    # Target column name in raw file
+    target_column: "label"
+
+  cicids2017:
+    data_dir: "data/raw/cicids2017/"
+    files:
+      - "Monday-WorkingHours.pcap_ISCX.csv"
+      - "Tuesday-WorkingHours.pcap_ISCX.csv"
+      - "Wednesday-workingHours.pcap_ISCX.csv"
+      - "Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv"
+      - "Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv"
+      - "Friday-WorkingHours-Morning.pcap_ISCX.csv"
+      - "Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv"
+      - "Friday-WorkingHours-Afternoon-DDoS.pcap_ISCX.csv"
+    # 80 bidirectional flow features (Chapter 3, Section 3.3.1)
+    n_features: 80
+    target_column: " Label"  # Note leading space in raw files
+    benign_label: "BENIGN"
+
+  unsw_nb15:
+    train_file: "data/raw/unsw_nb15/UNSW_NB15_training-set.csv"
+    test_file: "data/raw/unsw_nb15/UNSW_NB15_testing-set.csv"
+    features_file: "data/raw/unsw_nb15/UNSW-NB15_features.csv"
+    gt_file: "data/raw/unsw_nb15/UNSW-NB15_GT.csv"
+    # 49 features (Chapter 3, Section 3.3.1)
+    n_features: 49
+    target_column: "attack_cat"
+    binary_label_column: "label"
+
+# Preprocessing Configuration
+# Chapter 3, Section 3.5.2 — Data Preprocessing Pipeline
+preprocessing:
+  # Data cleaning
+  handle_missing: true
+  missing_strategy_continuous: "mean"    # Chapter 3: mean imputation
+  missing_strategy_categorical: "mode"   # Chapter 3: mode imputation
+  remove_duplicates: true
+  handle_infinite: true                  # Replace inf with NaN then impute
+  # Encoding
+  encoding_method: "onehot"             # One-hot for categorical features
+  drop_first: false                      # Keep all dummy columns
+  # Scaling
+  scaler: "minmax"                       # Min-Max scaling [0,1] per Chapter 3
+  scaler_feature_range: [0, 1]
+  # Class balancing
+  use_class_weights: true               # Primary method (Chapter 3, Sec 3.5.4)
+  use_smote: false                      # Optional, disabled by default
+
+# Sequence Builder Configuration
+# Chapter 3, Section 3.5.2 — Sequence Construction
+# Window size 10 selected from hyperparameter search
+sequence:
+  window_size: 10          # Sliding window of 10 consecutive records
+  step_size: 1             # Slide by 1 at each step (overlapping windows)
+  label_position: "last"   # Label = class of the final timestep in window
+
+# Data Split Configuration
+# Chapter 3, Section 3.5.2 — Data Splitting
+# 70% train / 15% validation / 15% test, stratified
+split:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: true
+
+# LSTM Model Architecture
+# Chapter 3, Section 3.5.3 — LSTM Model Architecture Design
+model:
+  type: "lstm"
+  architecture:
+    lstm_layers:
+      - units: 128
+        return_sequences: true
+        dropout: 0.2
+        activation: "tanh"
+        recurrent_activation: "sigmoid"
+      - units: 64
+        return_sequences: false
+        dropout: 0.2
+        activation: "tanh"
+        recurrent_activation: "sigmoid"
+    dense_layers:
+      - units: 32
+        activation: "relu"
+        l2_regularization: 0.001   # Chapter 3: L2 λ=0.001
+        batch_normalization: true
+    output_activation: "softmax"
+  # Compilation settings (Chapter 3, Section 3.5.3)
+  optimizer: "adam"
+  learning_rate: 0.001              # Initial LR per Chapter 3
+  loss: "categorical_crossentropy"
+  metrics:
+    - "accuracy"
+    - "Precision"
+    - "Recall"
+
+# Training Configuration
+# Chapter 3, Section 3.5.4 — Model Training and Optimisation
+training:
+  epochs: 100                    # Up to 100 epochs (Chapter 3)
+  batch_size: 64                 # Batch size 64 (Chapter 3)
+  # Callbacks
+  early_stopping:
+    enabled: true
+    monitor: "val_loss"
+    patience: 10                  # Chapter 3: patience=10
+    restore_best_weights: true
+    min_delta: 0.0001
+  model_checkpoint:
+    enabled: true
+    monitor: "val_loss"
+    save_best_only: true
+    filepath: "models/checkpoints/best_model.keras"
+  reduce_lr:
+    enabled: true
+    monitor: "val_loss"
+    factor: 0.5
+    patience: 5
+    min_lr: 0.000001
+  tensorboard:
+    enabled: true
+    log_dir: "reports/logs/tensorboard"
+  csv_logger:
+    enabled: true
+    filepath: "reports/logs/training_history.csv"
+
+# Hyperparameter Tuning Configuration
+# Chapter 3, Section 3.5.4 — Grid search parameters
+hyperparameter_tuning:
+  enabled: false                # Set true to run tuning
+  method: "grid_search"        # grid_search | random_search | optuna
+  n_trials: 50                 # For random/optuna search
+  # Search grid (Chapter 3, Section 3.5.4)
+  search_space:
+    n_lstm_layers: [1, 2, 3]
+    lstm_units: [32, 64, 128, 256]
+    dropout_rate: [0.1, 0.2, 0.3, 0.5]
+    learning_rate: [0.01, 0.001, 0.0001]
+    batch_size: [32, 64, 128]
+  # Metric to optimise
+  objective: "val_accuracy"
+  direction: "maximize"
+
+# Baseline Models Configuration
+# Chapter 3 — Baseline Models for Comparison (RF, SVM, RNN)
+baselines:
+  random_forest:
+    enabled: true
+    n_estimators: 100
+    max_depth: null
+    random_state: 42
+    n_jobs: -1
+    class_weight: "balanced"
+  svm:
+    enabled: true
+    kernel: "rbf"
+    C: 1.0
+    gamma: "scale"
+    max_iter: 1000
+    class_weight: "balanced"
+  logistic_regression:
+    enabled: true
+    max_iter: 1000
+    random_state: 42
+    class_weight: "balanced"
+    solver: "lbfgs"
+    # multi_class removed — deprecated and removed in scikit-learn 1.5+
+    # lbfgs handles multinomial natively
+  rnn:
+    enabled: true
+    units: 64
+    epochs: 50
+    batch_size: 64
+
+# Evaluation Configuration
+# Chapter 3, Section 3.5.5 — Model Evaluation
+evaluation:
+  metrics:
+    - accuracy
+    - precision_macro
+    - precision_weighted
+    - recall_macro
+    - recall_weighted
+    - f1_macro
+    - f1_weighted
+    - roc_auc
+    - confusion_matrix
+  # Report averaging modes
+  averaging: ["macro", "weighted"]
+  # ROC curve
+  roc_curve: true
+  precision_recall_curve: true
+  # Feature importance
+  permutation_importance: true
+  n_permutation_repeats: 10
+
+# Paths Configuration
+paths:
+  data:
+    raw: "data/raw"
+    interim: "data/interim"
+    processed: "data/processed"
+    sample: "data/sample"
+  models:
+    checkpoints: "models/checkpoints"
+    final: "models/final"
+    baselines: "models/baselines"
+  reports:
+    figures: "reports/figures"
+    tables: "reports/tables"
+    metrics: "reports/metrics"
+    logs: "reports/logs"
+  outputs:
+    predictions: "outputs/predictions"
+    exported: "outputs/exported"
+  docs:
+    architecture: "docs/architecture"
+    methodology: "docs/methodology"
+    screenshots: "docs/screenshots"
+
+# Visualization Configuration
+visualization:
+  dpi: 300                      # Publication quality (Chapter 4 figures)
+  figure_size: [12, 8]
+  style: "seaborn-v0_8-whitegrid"
+  color_palette: "husl"
+  save_format: "png"
+  font_size: 12
+  title_font_size: 14
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s — %(name)s — %(levelname)s — %(message)s"
+  file: "reports/logs/pipeline.log"
+  console: true

@@ -1,0 +1,65 @@
+
+# Deep Learning IDS Using LSTM - Requirements
+# Project: Design and Implementation of a Deep Learning
+#          Intrusion Detection System Using LSTM
+# Author:  Kayode Timileyin Nicholas (Cybersecurity Final Year Project - FUTA, Nigeria)
+# Python:  3.9+  (3.9 recommended per Chapter 3)
+
+# Core Deep Learning Framework
+# TensorFlow 2.10 as specified in Chapter 3 (Section 3.3.2)
+tensorflow==2.21.0
+keras
+
+# Optional Secondary Deep Learning Framework
+# PyTorch 1.13 as specified in Chapter 3 (Section 3.3.2)
+torch==2.12.0+cpu
+torchvision==0.27.0+cpu
+
+# Data Processing
+numpy
+pandas
+scipy
+
+# Machine Learning (Baseline Models + Evaluation)
+# scikit-learn provides preprocessing, evaluation metrics,
+# confusion matrix, ROC curves, classification report
+scikit-learn
+joblib
+
+# Class Imbalance Handling (SMOTE support)
+imbalanced-learn
+
+# Visualization
+# Matplotlib + Seaborn for all Chapter 4 figures
+matplotlib
+seaborn
+
+# Configuration Management
+pyyaml
+
+# Experiment Tracking
+tensorboard
+
+# Model Serialization
+h5py
+pickle5; python_version < "3.8"
+
+# Hyperparameter Tuning
+keras-tuner
+optuna
+
+# Jupyter Notebooks (optional interactive exploration)
+jupyter
+notebook
+ipykernel
+ipywidgets
+
+# Testing
+pytest
+pytest-cov
+
+# Utilities
+tqdm
+colorlog
+click
+tabulate

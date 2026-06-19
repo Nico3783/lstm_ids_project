@@ -1,0 +1,79 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="uRYHTCHp70EVG4hm7dNP">
+    <mxGraphModel dx="835" dy="475" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-1" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;                    fontSize=15;fontStyle=1;" value="Data Flow Diagram — LSTM IDS Pipeline" vertex="1">
+          <mxGeometry height="35" width="600" x="125" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;                    strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;Stage 1 — Raw Dataset Files&lt;/b&gt;&#xa;NSL-KDD: KDDTrain+.txt / KDDTest+.txt&#xa;CICIDS2017: 8 daily CSV files&#xa;UNSW-NB15: training + testing CSV&#xa;&#xa;Format: headerless CSV / CSV with header" vertex="1">
+          <mxGeometry height="80" width="500" x="175" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-3" edge="1" parent="1" source="M6lEGbDwnyNjJ1Dr8hjO-2" style="edgeStyle=orthogonalEdgeStyle;" target="M6lEGbDwnyNjJ1Dr8hjO-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-4" connectable="0" parent="M6lEGbDwnyNjJ1Dr8hjO-3" style="edgeLabel;fontSize=9;             fontStyle=2;align=center;verticalAlign=bottom;" value="src/data/loaders.py" vertex="1">
+          <mxGeometry relative="0.5" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;                    strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;Stage 2 — Loaded DataFrame&lt;/b&gt;&#xa;Shape: (N, 43) for NSL-KDD (41 features + label + difficulty)&#xa;• Column names assigned from NSL_KDD_COLUMNS constant&#xa;• All dtypes preserved as loaded (str / float)&#xa;• Validation report generated (CheckResult per check)" vertex="1">
+          <mxGeometry height="80" width="500" x="175" y="195" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-6" edge="1" parent="1" source="M6lEGbDwnyNjJ1Dr8hjO-5" style="edgeStyle=orthogonalEdgeStyle;" target="M6lEGbDwnyNjJ1Dr8hjO-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-7" connectable="0" parent="M6lEGbDwnyNjJ1Dr8hjO-6" style="edgeLabel;fontSize=9;             fontStyle=2;align=center;verticalAlign=bottom;" value="src/data/preprocessing.py" vertex="1">
+          <mxGeometry relative="0.5" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;                    strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;Stage 3 — Cleaned DataFrame&lt;/b&gt;&#xa;• difficulty column dropped&#xa;• Missing values imputed (mean=continuous, mode=categorical)&#xa;• Infinite values replaced with NaN → imputed&#xa;• Duplicate rows removed&#xa;Saved: data/interim/cleaned_dataset.csv" vertex="1">
+          <mxGeometry height="85" width="500" x="175" y="325" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-9" edge="1" parent="1" source="M6lEGbDwnyNjJ1Dr8hjO-8" style="edgeStyle=orthogonalEdgeStyle;" target="M6lEGbDwnyNjJ1Dr8hjO-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-10" connectable="0" parent="M6lEGbDwnyNjJ1Dr8hjO-9" style="edgeLabel;fontSize=9;fontStyle=2;align=center;verticalAlign=bottom;" value="map_nsl_kdd_labels() + encode_categorical_features()" vertex="1">
+          <mxGeometry relative="0.5" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;                    strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;Stage 4 — Encoded DataFrame&lt;/b&gt;&#xa;• Raw attack labels → 5-class integers (0=Normal, 1=DoS, 2=Probe, 3=R2L, 4=U2R)&#xa;• One-hot encoding: protocol_type (3), service (70), flag (11) → ~84 new columns&#xa;• Final feature count: 41 columns (NSL-KDD specification)&#xa;Saved: data/interim/encoded_dataset.csv" vertex="1">
+          <mxGeometry height="85" width="500" x="175" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-12" edge="1" parent="1" source="M6lEGbDwnyNjJ1Dr8hjO-11" style="edgeStyle=orthogonalEdgeStyle;" target="M6lEGbDwnyNjJ1Dr8hjO-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-13" connectable="0" parent="M6lEGbDwnyNjJ1Dr8hjO-12" style="edgeLabel;fontSize=9;fontStyle=2;align=center;verticalAlign=bottom;" value="fit_scaler(X_train) → apply_scaler(X_all)" vertex="1">
+          <mxGeometry relative="0.5" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;                    strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;Stage 5 — Scaled Feature Matrix  +  Label Vector&lt;/b&gt;&#xa;X: ndarray (N, 41), dtype=float32, range=[0.0, 1.0]&#xa;y: ndarray (N,),  dtype=int64,   values={0,1,2,3,4}&#xa;MinMaxScaler fitted on training split ONLY (no data leakage)&#xa;Saved: data/interim/scaled_dataset.csv" vertex="1">
+          <mxGeometry height="85" width="500" x="175" y="596" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-15" edge="1" parent="1" source="M6lEGbDwnyNjJ1Dr8hjO-14" style="edgeStyle=orthogonalEdgeStyle;" target="M6lEGbDwnyNjJ1Dr8hjO-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-16" connectable="0" parent="M6lEGbDwnyNjJ1Dr8hjO-15" style="edgeLabel;fontSize=9;fontStyle=2;align=center;verticalAlign=bottom;" value="build_sequences(window=10, step=1, label=&#39;last&#39;)" vertex="1">
+          <mxGeometry relative="0.5" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-17" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;                    strokeColor=#d79b00;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;Stage 6 — 3-D Sequence Tensor&lt;/b&gt;&#xa;X_seq: ndarray (N-9, 10, 41), dtype=float32&#xa;y_seq: ndarray (N-9,),       dtype=int64&#xa;Each sequence: 10 consecutive traffic records&#xa;Label = class of final (10th) timestep" vertex="1">
+          <mxGeometry height="80" width="500" x="175" y="733" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-18" edge="1" parent="1" source="M6lEGbDwnyNjJ1Dr8hjO-17" style="edgeStyle=orthogonalEdgeStyle;" target="M6lEGbDwnyNjJ1Dr8hjO-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-19" connectable="0" parent="M6lEGbDwnyNjJ1Dr8hjO-18" style="edgeLabel;fontSize=9;fontStyle=2;align=center;verticalAlign=bottom;" value="split_sequences(train=0.70, val=0.15, test=0.15, stratified=True)" vertex="1">
+          <mxGeometry relative="0.5" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-20" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;                    strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;Stage 7 — Stratified Split Arrays&lt;/b&gt;&#xa;X_train (70%): (N₁, 10, 41)   y_train: (N₁,)&#xa;X_val   (15%): (N₂, 10, 41)   y_val  : (N₂,)&#xa;X_test  (15%): (N₃, 10, 41)   y_test : (N₃,)&#xa;Saved: data/processed/*.npy  |  Artifacts: scaler.pkl, label_encoder.pkl" vertex="1">
+          <mxGeometry height="85" width="500" x="175" y="863" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-21" edge="1" parent="1" source="M6lEGbDwnyNjJ1Dr8hjO-20" style="edgeStyle=orthogonalEdgeStyle;" target="M6lEGbDwnyNjJ1Dr8hjO-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-22" connectable="0" parent="M6lEGbDwnyNjJ1Dr8hjO-21" style="edgeLabel;fontSize=9;fontStyle=2;align=center;verticalAlign=bottom;" value="model.fit(X_train, y_train_onehot, class_weight=...)" vertex="1">
+          <mxGeometry relative="0.5" as="geometry" />
+        </mxCell>
+        <mxCell id="M6lEGbDwnyNjJ1Dr8hjO-23" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;                    strokeColor=#b85450;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;Stage 8 — Trained LSTM Model + Evaluation Reports&lt;/b&gt;&#xa;Saved: models/final/lstm_ids_model.keras&#xa;Metrics: Accuracy, Precision (macro+wtd), Recall, F1, ROC-AUC&#xa;Figures: confusion_matrix.png, roc_curve.png, training_curves.png&#xa;Tables: final_metrics.csv, baseline_metrics.csv" vertex="1">
+          <mxGeometry height="85" width="500" x="175" y="1000" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,23 @@
+# Colab-specific extras
+# Colab already has: numpy, pandas, matplotlib, seaborn, scikit-learn,
+# tensorflow (GPU), scipy, h5py, tensorboard, jupyter, tqdm, joblib
+#
+# This file installs ONLY what's missing from Colab's default environment.
+
+# Keras 3 standalone (Colab has tf.keras, but project uses standalone keras)
+keras>=3.0
+
+# Class imbalance
+imbalanced-learn
+
+# Config
+pyyaml
+
+# Hyperparameter tuning
+keras-tuner
+optuna
+
+# Utilities
+colorlog
+tabulate
+click

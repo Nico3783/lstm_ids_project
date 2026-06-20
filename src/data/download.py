@@ -371,10 +371,9 @@ STEP 2 — Click the download link for the CSV files.
   (You may be asked to complete a short registration form.)
 
 STEP 3 — Download the following files:
-  • UNSW_NB15_training-set.csv     (~83 MB)
-  • UNSW_NB15_testing-set.csv      (~17 MB)
-  • UNSW-NB15_features.csv         (feature descriptions)
-  • UNSW-NB15_GT.csv               (ground truth labels)
+  • UNSW_NB15_training-set.csv     (~32 MB, 175,341 records)
+  • UNSW_NB15_testing-set.csv      (~15 MB, 82,332 records)
+  • UNSW-NB15_features.csv         (feature descriptions, 49 features)
 
 STEP 4 — Place all files in:
   data/raw/unsw_nb15/
@@ -582,10 +581,9 @@ def validate_unsw_nb15(data_dir: Optional[Path] = None) -> bool:
     logger.info("Validating UNSW-NB15 dataset at: %s", data_dir)
 
     required_files = [
-        ("UNSW_NB15_training-set.csv", 80_000_000,  100_000_000),
-        ("UNSW_NB15_testing-set.csv",  15_000_000,   25_000_000),
+        ("UNSW_NB15_training-set.csv", 20_000_000,  100_000_000),
+        ("UNSW_NB15_testing-set.csv",  10_000_000,   25_000_000),
         ("UNSW-NB15_features.csv",     1_000,         500_000),
-        ("UNSW-NB15_GT.csv",           1_000,       5_000_000),
     ]
 
     all_ok = True

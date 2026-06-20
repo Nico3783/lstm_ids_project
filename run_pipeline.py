@@ -109,8 +109,8 @@ def main() -> None:
     pipeline_timer = Timer("Full pipeline")
     pipeline_timer.start()
 
-    # Check if we can resume from preprocessed data
-    from src.utils.paths import PROCESSED_DATA_DIR
+    # Compute dataset-specific processed data directory
+    from src.utils.paths import get_processed_data_dir
     from src.utils.constants import (
         X_TRAIN_NPY, X_VAL_NPY, X_TEST_NPY,
         Y_TRAIN_NPY, Y_VAL_NPY, Y_TEST_NPY,
@@ -119,22 +119,45 @@ def main() -> None:
     )
     import numpy as np
 
+    processed_dir = get_processed_data_dir(args.dataset)
+    logger.info("Processed data dir: %s", processed_dir)
+
+    # Check if we can resume from preprocessed data
     can_resume = True
     for fname in [X_TRAIN_NPY, X_VAL_NPY, X_TEST_NPY, Y_TRAIN_NPY, Y_VAL_NPY, Y_TEST_NPY, SCALER_PKL, LABEL_ENCODER_PKL, FEATURE_NAMES_PKL, METADATA_JSON]:
-        if not (PROCESSED_DATA_DIR / fname).exists():
+        if not (processed_dir / fname).exists():
             can_resume = False
             break
 
     if args.resume and can_resume:
-        logger.info("Resuming pipeline: skipping EDA, preprocessing, and sequence building stages.")
         from src.utils.serialization import load_processed_arrays, load_preprocessing_artifacts
-        
-        X_train, X_val, X_test, y_train, y_val, y_test = load_processed_arrays(PROCESSED_DATA_DIR)
-        scaler, label_encoder, feature_names, metadata = load_preprocessing_artifacts(PROCESSED_DATA_DIR)
+
+        X_train, X_val, X_test, y_train, y_val, y_test = load_processed_arrays(processed_dir)
+        scaler, label_encoder, feature_names, metadata = load_preprocessing_artifacts(processed_dir)
+
+        # Validate that the processed data belongs to the requested dataset
+        saved_dataset = metadata.get("dataset", "")
+        if saved_dataset != args.dataset:
+            logger.error(
+                "Dataset mismatch: processed data is for '%s' "
+                "but '%s' was requested. Delete the old data and "
+                "re-run without --resume.",
+                saved_dataset, args.dataset,
+            )
+            sys.exit(1)
+
         n_classes = metadata["n_classes"]
+        logger.info(
+            "Resuming pipeline: skipping EDA, preprocessing, "
+            "and sequence building stages."
+        )
     else:
         if args.resume:
-            logger.warning("Resume flag passed, but processed arrays or preprocessing artifacts are missing. Running full preprocessing pipeline.")
+            logger.warning(
+                "Resume flag passed, but processed arrays or "
+                "preprocessing artifacts are missing. "
+                "Running full preprocessing pipeline."
+            )
 
         # STAGE 1 — Validate dataset
         log_section_header(logger, "STAGE 1 — DATASET VALIDATION")
@@ -184,7 +207,7 @@ def main() -> None:
             drop_first=cfg.preprocessing.drop_first,
             feature_range=cfg.preprocessing.scaler_feature_range,
             save_interim_files=True,
-            artifacts_dir=PROCESSED_DATA_DIR,
+            artifacts_dir=processed_dir,
         )
         n_classes = metadata["n_classes"]
         logger.info(
@@ -220,7 +243,7 @@ def main() -> None:
 
         X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(
             X_seq, y_seq,
-            output_dir=PROCESSED_DATA_DIR,
+            output_dir=processed_dir,
             train_ratio=cfg.split.train_ratio,
             val_ratio=cfg.split.val_ratio,
             test_ratio=cfg.split.test_ratio,

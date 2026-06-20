@@ -375,6 +375,41 @@ def get_raw_data_dir(dataset: str) -> Path:
     return mapping[dataset]
 
 
+def get_processed_data_dir(dataset: str) -> Path:
+    """
+    Return the processed data directory for the specified dataset.
+
+    Each dataset gets its own subdirectory under ``data/processed/``
+    to prevent preprocessed arrays from one dataset overwriting
+    another's (the isolation bug fix).
+
+    Parameters
+    ----------
+    dataset : str
+        Dataset identifier — one of ``nsl_kdd``, ``cicids2017``,
+        ``unsw_nb15``.
+
+    Returns
+    -------
+    Path
+        Absolute path to ``data/processed/<dataset>/``.
+
+    Raises
+    ------
+    ValueError
+        If *dataset* is not a recognised identifier.
+    """
+    valid = {"nsl_kdd", "cicids2017", "unsw_nb15"}
+    if dataset not in valid:
+        raise ValueError(
+            f"Unknown dataset '{dataset}'. "
+            f"Choose from: {sorted(valid)}"
+        )
+    path = PROCESSED_DATA_DIR / dataset
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def get_checkpoint_path(epoch: Optional[int] = None) -> Path:
     """
     Return the path for a training checkpoint file.

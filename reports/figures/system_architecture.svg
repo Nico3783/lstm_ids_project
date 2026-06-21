@@ -1,0 +1,255 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 920" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="dataGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="processGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <linearGradient id="modelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="detectGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ef4444"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+    <linearGradient id="safeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="2" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+    <marker id="arrowWhite" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="920" fill="url(#bgGrad)" rx="12"/>
+
+  <text x="600" y="50" text-anchor="middle" fill="white" font-size="24" font-weight="bold">System Architecture — LSTM-Based Intrusion Detection System</text>
+  <text x="600" y="78" text-anchor="middle" fill="#94a3b8" font-size="14">End-to-End Pipeline for Network Traffic Classification</text>
+
+  <!-- ROW 1: DATA SOURCES -->
+  <text x="130" y="120" fill="#64748b" font-size="12" font-weight="bold" letter-spacing="2">DATA SOURCES</text>
+
+  <!-- NSL-KDD -->
+  <g filter="url(#shadow)">
+    <rect x="30" y="135" width="180" height="115" rx="10" fill="url(#dataGrad)" opacity="0.95"/>
+    <ellipse cx="120" cy="168" rx="28" ry="10" fill="none" stroke="#bfdbfe" stroke-width="1.5"/>
+    <path d="M92,168 L92,183 C92,188 120,196 120,196 C120,196 148,188 148,183 L148,168" fill="none" stroke="#bfdbfe" stroke-width="1.5"/>
+    <ellipse cx="120" cy="183" rx="28" ry="10" fill="none" stroke="#bfdbfe" stroke-width="1.5" opacity="0.6"/>
+    <text x="120" y="220" text-anchor="middle" fill="white" font-size="14" font-weight="bold">NSL-KDD</text>
+    <text x="120" y="237" text-anchor="middle" fill="#bfdbfe" font-size="11">125,973 samples</text>
+    <text x="120" y="247" text-anchor="middle" fill="#bfdbfe" font-size="11">5 classes</text>
+  </g>
+
+  <!-- CICIDS2017 -->
+  <g filter="url(#shadow)">
+    <rect x="240" y="135" width="180" height="115" rx="10" fill="url(#dataGrad)" opacity="0.95"/>
+    <ellipse cx="330" cy="168" rx="28" ry="10" fill="none" stroke="#bfdbfe" stroke-width="1.5"/>
+    <path d="M302,168 L302,183 C302,188 330,196 330,196 C330,196 358,188 358,183 L358,168" fill="none" stroke="#bfdbfe" stroke-width="1.5"/>
+    <ellipse cx="330" cy="183" rx="28" ry="10" fill="none" stroke="#bfdbfe" stroke-width="1.5" opacity="0.6"/>
+    <text x="330" y="220" text-anchor="middle" fill="white" font-size="14" font-weight="bold">CICIDS2017</text>
+    <text x="330" y="237" text-anchor="middle" fill="#bfdbfe" font-size="11">2.8M samples</text>
+    <text x="330" y="247" text-anchor="middle" fill="#bfdbfe" font-size="11">15 classes</text>
+  </g>
+
+  <!-- UNSW-NB15 -->
+  <g filter="url(#shadow)">
+    <rect x="450" y="135" width="180" height="115" rx="10" fill="url(#dataGrad)" opacity="0.95"/>
+    <ellipse cx="540" cy="168" rx="28" ry="10" fill="none" stroke="#bfdbfe" stroke-width="1.5"/>
+    <path d="M512,168 L512,183 C512,188 540,196 540,196 C540,196 568,188 568,183 L568,168" fill="none" stroke="#bfdbfe" stroke-width="1.5"/>
+    <ellipse cx="540" cy="183" rx="28" ry="10" fill="none" stroke="#bfdbfe" stroke-width="1.5" opacity="0.6"/>
+    <text x="540" y="220" text-anchor="middle" fill="white" font-size="14" font-weight="bold">UNSW-NB15</text>
+    <text x="540" y="237" text-anchor="middle" fill="#bfdbfe" font-size="11">257,673 samples</text>
+    <text x="540" y="247" text-anchor="middle" fill="#bfdbfe" font-size="11">5 classes</text>
+  </g>
+
+  <!-- ROW 2: PREPROCESSING -->
+  <text x="130" y="290" fill="#64748b" font-size="12" font-weight="bold" letter-spacing="2">PREPROCESSING</text>
+
+  <!-- Data Ingestion -->
+  <g filter="url(#shadow)">
+    <rect x="30" y="305" width="150" height="95" rx="8" fill="url(#processGrad)" opacity="0.95"/>
+    <path d="M55,328 L55,323 C55,321 57,319 59,319 L80,319 L85,325 L140,325 C142,325 144,327 144,329 L144,363 C144,365 142,367 140,367 L59,367 C57,367 55,365 55,363 Z" fill="none" stroke="#a7f3d0" stroke-width="1.5"/>
+    <text x="105" y="350" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Data Ingestion</text>
+    <text x="105" y="370" text-anchor="middle" fill="#a7f3d0" font-size="10">Load &amp; Validate</text>
+  </g>
+
+  <!-- Cleaning -->
+  <g filter="url(#shadow)">
+    <rect x="200" y="305" width="150" height="95" rx="8" fill="url(#processGrad)" opacity="0.95"/>
+    <line x1="240" y1="333" x2="275" y2="353" stroke="#a7f3d0" stroke-width="2"/>
+    <circle cx="280" cy="358" r="7" fill="none" stroke="#a7f3d0" stroke-width="1.5"/>
+    <text x="275" y="350" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Data Cleaning</text>
+    <text x="275" y="370" text-anchor="middle" fill="#a7f3d0" font-size="10">Missing Values</text>
+  </g>
+
+  <!-- Feature Engineering -->
+  <g filter="url(#shadow)">
+    <rect x="370" y="305" width="150" height="95" rx="8" fill="url(#processGrad)" opacity="0.95"/>
+    <circle cx="445" cy="338" r="7" fill="none" stroke="#a7f3d0" stroke-width="1.5"/>
+    <circle cx="445" cy="338" r="2.5" fill="#a7f3d0"/>
+    <g stroke="#a7f3d0" stroke-width="1.5">
+      <line x1="445" y1="329" x2="445" y2="324"/><line x1="445" y1="347" x2="445" y2="352"/>
+      <line x1="436" y1="338" x2="431" y2="338"/><line x1="454" y1="338" x2="459" y2="338"/>
+    </g>
+    <text x="445" y="370" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Feature Eng.</text>
+    <text x="445" y="385" text-anchor="middle" fill="#a7f3d0" font-size="10">Encode &amp; Scale</text>
+  </g>
+
+  <!-- Normalization -->
+  <g filter="url(#shadow)">
+    <rect x="540" y="305" width="150" height="95" rx="8" fill="url(#processGrad)" opacity="0.95"/>
+    <rect x="578" y="330" width="6" height="18" rx="1" fill="#a7f3d0"/>
+    <rect x="588" y="325" width="6" height="23" rx="1" fill="#a7f3d0"/>
+    <rect x="598" y="320" width="6" height="28" rx="1" fill="#a7f3d0"/>
+    <rect x="608" y="328" width="6" height="20" rx="1" fill="#a7f3d0"/>
+    <text x="615" y="370" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Normalization</text>
+    <text x="615" y="385" text-anchor="middle" fill="#a7f3d0" font-size="10">Min-Max Scaling</text>
+  </g>
+
+  <!-- Sequence Building -->
+  <g filter="url(#shadow)">
+    <rect x="710" y="305" width="150" height="95" rx="8" fill="url(#processGrad)" opacity="0.95"/>
+    <rect x="758" y="328" width="40" height="5" rx="2" fill="#a7f3d0" opacity="0.5"/>
+    <rect x="753" y="337" width="40" height="5" rx="2" fill="#a7f3d0" opacity="0.7"/>
+    <rect x="748" y="346" width="40" height="5" rx="2" fill="#a7f3d0" opacity="0.9"/>
+    <text x="785" y="370" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Sequence Build</text>
+    <text x="785" y="385" text-anchor="middle" fill="#a7f3d0" font-size="10">Sliding Window</text>
+  </g>
+
+  <!-- ROW 3: SPLIT -->
+  <text x="130" y="440" fill="#64748b" font-size="12" font-weight="bold" letter-spacing="2">DATA SPLITTING</text>
+
+  <g filter="url(#shadow)">
+    <rect x="30" y="455" width="830" height="80" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1" opacity="0.9"/>
+    <rect x="50" y="470" width="230" height="45" rx="6" fill="#2563eb" opacity="0.8"/>
+    <text x="165" y="498" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Training Set (80%)</text>
+    <rect x="300" y="470" width="130" height="45" rx="6" fill="#7c3aed" opacity="0.8"/>
+    <text x="365" y="498" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Validation (10%)</text>
+    <rect x="450" y="470" width="130" height="45" rx="6" fill="#ea580c" opacity="0.8"/>
+    <text x="515" y="498" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Test Set (10%)</text>
+    <text x="700" y="498" text-anchor="middle" fill="#94a3b8" font-size="11">Stratified • Temporal Split • No Leakage</text>
+  </g>
+
+  <!-- ROW 4: MODEL -->
+  <text x="130" y="585" fill="#64748b" font-size="12" font-weight="bold" letter-spacing="2">LSTM MODEL</text>
+
+  <!-- Input Layer -->
+  <g filter="url(#shadow)">
+    <rect x="30" y="600" width="120" height="110" rx="8" fill="#1e293b" stroke="#60a5fa" stroke-width="2"/>
+    <text x="90" y="625" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="bold">INPUT</text>
+    <text x="90" y="645" text-anchor="middle" fill="#93c5fd" font-size="10">(10, 122)</text>
+    <text x="90" y="665" text-anchor="middle" fill="#94a3b8" font-size="9">Sliding Window</text>
+    <text x="90" y="680" text-anchor="middle" fill="#94a3b8" font-size="9">10 timesteps</text>
+  </g>
+
+  <line x1="150" y1="655" x2="180" y2="655" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowWhite)"/>
+
+  <!-- LSTM 128 -->
+  <g filter="url(#shadow)">
+    <rect x="185" y="600" width="150" height="110" rx="8" fill="url(#modelGrad)" opacity="0.95"/>
+    <path d="M235,635 C235,625 275,625 275,635 C275,645 235,645 235,635" fill="none" stroke="#c4b5fd" stroke-width="2"/>
+    <polygon points="235,630 230,638 240,638" fill="#c4b5fd"/>
+    <text x="260" y="670" text-anchor="middle" fill="white" font-size="13" font-weight="bold">LSTM</text>
+    <text x="260" y="690" text-anchor="middle" fill="#c4b5fd" font-size="11">128 Units</text>
+  </g>
+
+  <line x1="335" y1="655" x2="365" y2="655" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowWhite)"/>
+
+  <!-- Dropout -->
+  <g filter="url(#shadow)">
+    <rect x="370" y="600" width="100" height="110" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <path d="M420,628 C420,628 408,645 408,652 C408,659 413,664 420,664 C427,664 432,659 432,652 C432,645 420,628 420,628Z" fill="none" stroke="#f97316" stroke-width="1.5"/>
+    <text x="420" y="688" text-anchor="middle" fill="#f97316" font-size="11" font-weight="bold">Dropout</text>
+    <text x="420" y="703" text-anchor="middle" fill="#fb923c" font-size="10">p=0.2</text>
+  </g>
+
+  <line x1="470" y1="655" x2="500" y2="655" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowWhite)"/>
+
+  <!-- LSTM 64 -->
+  <g filter="url(#shadow)">
+    <rect x="505" y="600" width="150" height="110" rx="8" fill="url(#modelGrad)" opacity="0.95"/>
+    <path d="M555,635 C555,625 595,625 595,635 C595,645 555,645 555,635" fill="none" stroke="#c4b5fd" stroke-width="2"/>
+    <polygon points="555,630 550,638 560,638" fill="#c4b5fd"/>
+    <text x="580" y="670" text-anchor="middle" fill="white" font-size="13" font-weight="bold">LSTM</text>
+    <text x="580" y="690" text-anchor="middle" fill="#c4b5fd" font-size="11">64 Units</text>
+  </g>
+
+  <line x1="655" y1="655" x2="685" y2="655" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowWhite)"/>
+
+  <!-- Dense + BN + Output -->
+  <g filter="url(#shadow)">
+    <rect x="690" y="600" width="170" height="110" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <rect x="708" y="618" width="60" height="22" rx="4" fill="#059669"/>
+    <text x="738" y="634" text-anchor="middle" fill="white" font-size="9" font-weight="bold">Dense 32</text>
+    <text x="738" y="656" text-anchor="middle" fill="#34d399" font-size="9">ReLU + L2</text>
+    <rect x="708" y="665" width="60" height="18" rx="4" fill="#0891b2"/>
+    <text x="738" y="678" text-anchor="middle" fill="white" font-size="9" font-weight="bold">BatchNorm</text>
+    <rect x="785" y="628" width="60" height="32" rx="4" fill="#d97706"/>
+    <text x="815" y="649" text-anchor="middle" fill="white" font-size="10" font-weight="bold">Output</text>
+    <text x="815" y="675" text-anchor="middle" fill="#fbbf24" font-size="10">5 Classes</text>
+    <text x="815" y="690" text-anchor="middle" fill="#fbbf24" font-size="9">Softmax</text>
+  </g>
+
+  <!-- ROW 5: OUTPUT -->
+  <text x="130" y="760" fill="#64748b" font-size="12" font-weight="bold" letter-spacing="2">DETECTION OUTPUT</text>
+
+  <!-- Attack Detected -->
+  <g filter="url(#shadow)">
+    <rect x="30" y="775" width="200" height="90" rx="10" fill="url(#detectGrad)" opacity="0.95"/>
+    <path d="M100,793 L80,801 L80,813 C80,828 100,838 100,838 C100,838 120,828 120,813 L120,801 Z" fill="none" stroke="#fecaca" stroke-width="2"/>
+    <line x1="100" y1="808" x2="100" y2="823" stroke="#fecaca" stroke-width="2"/>
+    <circle cx="100" cy="829" r="1.5" fill="#fecaca"/>
+    <text x="130" y="830" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Attack Detected</text>
+  </g>
+
+  <!-- Benign Traffic -->
+  <g filter="url(#shadow)">
+    <rect x="260" y="775" width="200" height="90" rx="10" fill="url(#safeGrad)" opacity="0.95"/>
+    <circle cx="335" cy="815" r="15" fill="none" stroke="#bbf7d0" stroke-width="2"/>
+    <polyline points="326,815 333,822 345,810" fill="none" stroke="#bbf7d0" stroke-width="2.5"/>
+    <text x="365" y="830" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Benign Traffic</text>
+  </g>
+
+  <!-- Alerts & Logs -->
+  <g filter="url(#shadow)">
+    <rect x="490" y="775" width="200" height="90" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <path d="M555,795 C555,795 545,795 545,805 L545,815 L540,820 L570,820 L565,815 L565,805 C565,795 555,795 555,795Z" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+    <circle cx="555" cy="825" r="2.5" fill="#f59e0b"/>
+    <text x="570" y="830" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Alerts &amp; Logs</text>
+  </g>
+
+  <!-- VERTICAL ARROWS -->
+  <line x1="330" y1="250" x2="330" y2="305" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowWhite)" stroke-dasharray="6,3"/>
+  <line x1="445" y1="400" x2="445" y2="455" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowWhite)" stroke-dasharray="6,3"/>
+  <line x1="445" y1="535" x2="445" y2="600" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowWhite)" stroke-dasharray="6,3"/>
+  <line x1="775" y1="710" x2="775" y2="775" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowWhite)" stroke-dasharray="6,3"/>
+
+  <!-- LEGEND -->
+  <g transform="translate(900, 135)">
+    <rect x="0" y="0" width="250" height="200" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="125" y="25" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Legend</text>
+    <rect x="15" y="40" width="16" height="16" rx="3" fill="url(#dataGrad)"/>
+    <text x="40" y="53" fill="#cbd5e1" font-size="11">Data Sources</text>
+    <rect x="15" y="65" width="16" height="16" rx="3" fill="url(#processGrad)"/>
+    <text x="40" y="78" fill="#cbd5e1" font-size="11">Preprocessing</text>
+    <rect x="15" y="90" width="16" height="16" rx="3" fill="url(#modelGrad)"/>
+    <text x="40" y="103" fill="#cbd5e1" font-size="11">LSTM Layers</text>
+    <rect x="15" y="115" width="16" height="16" rx="3" fill="#1e293b" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="40" y="128" fill="#cbd5e1" font-size="11">Input/Output Layers</text>
+    <rect x="15" y="140" width="16" height="16" rx="3" fill="url(#detectGrad)"/>
+    <text x="40" y="153" fill="#cbd5e1" font-size="11">Attack Detection</text>
+    <rect x="15" y="165" width="16" height="16" rx="3" fill="url(#safeGrad)"/>
+    <text x="40" y="178" fill="#cbd5e1" font-size="11">Benign Traffic</text>
+  </g>
+</svg>

@@ -1,0 +1,218 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="lstmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed"/>
+      <stop offset="100%" style="stop-color:#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="gateGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4f46e5"/>
+      <stop offset="100%" style="stop-color:#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="outGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+    <marker id="arrowW" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="680" fill="url(#bgGrad)" rx="12"/>
+
+  <text x="600" y="42" text-anchor="middle" fill="white" font-size="22" font-weight="bold">LSTM Model Architecture — Detailed Layer View</text>
+  <text x="600" y="66" text-anchor="middle" fill="#94a3b8" font-size="13">Binary Classification: Attack vs Benign • Input: (10, 122) • Total Parameters: 180,293</text>
+
+  <!-- INPUT BOX -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="100" width="140" height="260" rx="10" fill="#1e293b" stroke="#60a5fa" stroke-width="2"/>
+    <rect x="55" y="115" width="110" height="28" rx="5" fill="#1e40af" opacity="0.8"/>
+    <text x="110" y="135" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="bold">INPUT LAYER</text>
+    <text x="110" y="170" text-anchor="middle" fill="#60a5fa" font-size="11">Shape: (10, 122)</text>
+    <text x="110" y="190" text-anchor="middle" fill="#94a3b8" font-size="10">10 timesteps</text>
+    <text x="110" y="206" text-anchor="middle" fill="#94a3b8" font-size="10">122 features</text>
+    <line x1="60" y1="220" x2="160" y2="220" stroke="#334155" stroke-width="1"/>
+    <text x="110" y="245" text-anchor="middle" fill="#94a3b8" font-size="10">Flatten → 1220</text>
+    <text x="110" y="265" text-anchor="middle" fill="#60a5fa" font-size="10">Reshape → (10,122)</text>
+    <text x="110" y="295" text-anchor="middle" fill="#475569" font-size="9">Normalization:</text>
+    <text x="110" y="308" text-anchor="middle" fill="#475569" font-size="9">MinMax [0, 1]</text>
+    <text x="110" y="340" text-anchor="middle" fill="#3b82f6" font-size="11" font-weight="bold">Parameters: 0</text>
+  </g>
+
+  <line x1="180" y1="230" x2="220" y2="230" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowW)"/>
+
+  <!-- LSTM LAYER 1 -->
+  <g filter="url(#shadow)">
+    <rect x="225" y="100" width="260" height="260" rx="10" fill="url(#lstmGrad)" opacity="0.95"/>
+    <rect x="240" y="115" width="230" height="28" rx="5" fill="#4f46e5" opacity="0.8"/>
+    <text x="355" y="135" text-anchor="middle" fill="white" font-size="13" font-weight="bold">LSTM LAYER 1 — 128 Units</text>
+    <g transform="translate(245, 155)">
+      <rect width="105" height="105" rx="8" fill="url(#gateGrad)" opacity="0.7"/>
+      <text x="52" y="22" text-anchor="middle" fill="white" font-size="11" font-weight="bold">FORGET GATE</text>
+      <text x="52" y="42" text-anchor="middle" fill="#c7d2fe" font-size="10">σ(W·[h,x] + b)</text>
+      <text x="52" y="62" text-anchor="middle" fill="#a5b4fc" font-size="9">Determines what</text>
+      <text x="52" y="75" text-anchor="middle" fill="#a5b4fc" font-size="9">to discard from</text>
+      <text x="52" y="88" text-anchor="middle" fill="#a5b4fc" font-size="9">cell state</text>
+    </g>
+    <g transform="translate(355, 155)">
+      <rect width="105" height="105" rx="8" fill="url(#gateGrad)" opacity="0.7"/>
+      <text x="52" y="22" text-anchor="middle" fill="white" font-size="11" font-weight="bold">INPUT GATE</text>
+      <text x="52" y="42" text-anchor="middle" fill="#c7d2fe" font-size="10">σ(W·[h,x] + b)</text>
+      <text x="52" y="62" text-anchor="middle" fill="#a5b4fc" font-size="9">Determines which</text>
+      <text x="52" y="75" text-anchor="middle" fill="#a5b4fc" font-size="9">new values will</text>
+      <text x="52" y="88" text-anchor="middle" fill="#a5b4fc" font-size="9">be stored</text>
+    </g>
+    <g transform="translate(245, 270)">
+      <rect width="105" height="70" rx="8" fill="url(#gateGrad)" opacity="0.7"/>
+      <text x="52" y="22" text-anchor="middle" fill="white" font-size="11" font-weight="bold">CELL STATE</text>
+      <text x="52" y="42" text-anchor="middle" fill="#c7d2fe" font-size="10">Cₜ = fₜ⊙Cₜ₋₁ + iₜ⊙C̃ₜ</text>
+      <text x="52" y="58" text-anchor="middle" fill="#a5b4fc" font-size="9">Long-term memory</text>
+    </g>
+    <g transform="translate(355, 270)">
+      <rect width="105" height="70" rx="8" fill="url(#gateGrad)" opacity="0.7"/>
+      <text x="52" y="22" text-anchor="middle" fill="white" font-size="11" font-weight="bold">OUTPUT GATE</text>
+      <text x="52" y="42" text-anchor="middle" fill="#c7d2fe" font-size="10">oₜ = σ(W·[h,x] + b)</text>
+      <text x="52" y="58" text-anchor="middle" fill="#a5b4fc" font-size="9">Filters cell output</text>
+    </g>
+    <text x="355" y="360" text-anchor="middle" fill="#e0e7ff" font-size="11" font-weight="bold">Hidden State: hₜ ∈ ℝ¹²⁸  |  Cell State: Cₜ ∈ ℝ¹²⁸</text>
+    <text x="355" y="378" text-anchor="middle" fill="#c4b5fd" font-size="11">Parameters: (122 + 128 + 1) × 128 × 4 = 128,000</text>
+  </g>
+
+  <line x1="485" y1="230" x2="530" y2="230" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowW)"/>
+
+  <!-- DROPOUT -->
+  <g filter="url(#shadow)">
+    <rect x="535" y="100" width="110" height="260" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="590" y="130" text-anchor="middle" fill="#f97316" font-size="13" font-weight="bold">DROPOUT</text>
+    <text x="590" y="155" text-anchor="middle" fill="#fb923c" font-size="11">p = 0.2</text>
+    <line x1="565" y1="180" x2="615" y2="180" stroke="#475569" stroke-width="1"/>
+    <path d="M565,200 C565,200 590,230 565,260" fill="none" stroke="#f97316" stroke-width="1" stroke-dasharray="3,3"/>
+    <path d="M615,200 C615,200 590,230 615,260" fill="none" stroke="#f97316" stroke-width="1" stroke-dasharray="3,3"/>
+    <circle cx="590" cy="230" r="12" fill="none" stroke="#f97316" stroke-width="1.5"/>
+    <line x1="581" y1="221" x2="599" y2="239" stroke="#f97316" stroke-width="1.5"/>
+    <line x1="599" y1="221" x2="581" y2="239" stroke="#f97316" stroke-width="1.5"/>
+    <circle cx="575" cy="255" r="3" fill="#f97316" opacity="0.6"/>
+    <circle cx="605" cy="245" r="3" fill="#f97316" opacity="0.6"/>
+    <circle cx="590" cy="270" r="3" fill="#f97316" opacity="0.6"/>
+    <circle cx="578" cy="290" r="3" fill="#f97316" opacity="0.6"/>
+    <circle cx="608" cy="285" r="3" fill="#f97316" opacity="0.6"/>
+    <text x="590" y="325" text-anchor="middle" fill="#94a3b8" font-size="10">Zero-out 20%</text>
+    <text x="590" y="340" text-anchor="middle" fill="#94a3b8" font-size="10">of activations</text>
+    <text x="590" y="370" text-anchor="middle" fill="#f97316" font-size="11">Parameters: 0</text>
+  </g>
+
+  <line x1="645" y1="230" x2="685" y2="230" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowW)"/>
+
+  <!-- LSTM LAYER 2 -->
+  <g filter="url(#shadow)">
+    <rect x="690" y="100" width="240" height="260" rx="10" fill="url(#lstmGrad)" opacity="0.95"/>
+    <rect x="705" y="115" width="210" height="28" rx="5" fill="#4f46e5" opacity="0.8"/>
+    <text x="810" y="135" text-anchor="middle" fill="white" font-size="13" font-weight="bold">LSTM LAYER 2 — 64 Units</text>
+    <g transform="translate(705, 155)">
+      <rect width="95" height="80" rx="8" fill="url(#gateGrad)" opacity="0.7"/>
+      <text x="47" y="20" text-anchor="middle" fill="white" font-size="10" font-weight="bold">FORGET GATE</text>
+      <text x="47" y="38" text-anchor="middle" fill="#c7d2fe" font-size="9">σ(W·[h,x] + b)</text>
+      <text x="47" y="55" text-anchor="middle" fill="#a5b4fc" font-size="8">Discard cell</text>
+      <text x="47" y="66" text-anchor="middle" fill="#a5b4fc" font-size="8">information</text>
+    </g>
+    <g transform="translate(810, 155)">
+      <rect width="95" height="80" rx="8" fill="url(#gateGrad)" opacity="0.7"/>
+      <text x="47" y="20" text-anchor="middle" fill="white" font-size="10" font-weight="bold">INPUT GATE</text>
+      <text x="47" y="38" text-anchor="middle" fill="#c7d2fe" font-size="9">σ(W·[h,x] + b)</text>
+      <text x="47" y="55" text-anchor="middle" fill="#a5b4fc" font-size="8">Store new</text>
+      <text x="47" y="66" text-anchor="middle" fill="#a5b4fc" font-size="8">information</text>
+    </g>
+    <g transform="translate(705, 245)">
+      <rect width="95" height="55" rx="8" fill="url(#gateGrad)" opacity="0.7"/>
+      <text x="47" y="18" text-anchor="middle" fill="white" font-size="10" font-weight="bold">CELL STATE</text>
+      <text x="47" y="36" text-anchor="middle" fill="#c7d2fe" font-size="9">Cₜ update</text>
+      <text x="47" y="50" text-anchor="middle" fill="#a5b4fc" font-size="8">Long-term memory</text>
+    </g>
+    <g transform="translate(810, 245)">
+      <rect width="95" height="55" rx="8" fill="url(#gateGrad)" opacity="0.7"/>
+      <text x="47" y="18" text-anchor="middle" fill="white" font-size="10" font-weight="bold">OUTPUT GATE</text>
+      <text x="47" y="36" text-anchor="middle" fill="#c7d2fe" font-size="9">oₜ = σ(W·[h,x]+b)</text>
+      <text x="47" y="50" text-anchor="middle" fill="#a5b4fc" font-size="8">Filter output</text>
+    </g>
+    <text x="810" y="325" text-anchor="middle" fill="#e0e7ff" font-size="10" font-weight="bold">hₜ ∈ ℝ⁶⁴  |  Cₜ ∈ ℝ⁶⁴</text>
+    <text x="810" y="345" text-anchor="middle" fill="#c4b5fd" font-size="10">Parameters: (128 + 64 + 1) × 64 × 4 = 49,408</text>
+  </g>
+
+  <line x1="930" y1="230" x2="965" y2="230" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowW)"/>
+
+  <!-- CLASSIFICATION HEAD -->
+  <g filter="url(#shadow)">
+    <rect x="970" y="100" width="180" height="260" rx="10" fill="url(#outGrad)" opacity="0.95"/>
+    <rect x="985" y="115" width="150" height="28" rx="5" fill="#059669" opacity="0.8"/>
+    <text x="1060" y="135" text-anchor="middle" fill="white" font-size="12" font-weight="bold">CLASSIFICATION HEAD</text>
+
+    <rect x="985" y="155" width="150" height="35" rx="6" fill="#047857" opacity="0.7"/>
+    <text x="1060" y="178" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Dense 32 • ReLU</text>
+
+    <rect x="985" y="198" width="150" height="28" rx="6" fill="#0891b2" opacity="0.7"/>
+    <text x="1060" y="217" text-anchor="middle" fill="white" font-size="11" font-weight="bold">BatchNorm</text>
+
+    <rect x="985" y="234" width="150" height="28" rx="6" fill="#4f46e5" opacity="0.7"/>
+    <text x="1060" y="253" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Dropout (p=0.2)</text>
+
+    <rect x="985" y="270" width="150" height="28" rx="6" fill="#b45309" opacity="0.8"/>
+    <text x="1060" y="289" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Dense 1 • Sigmoid</text>
+
+    <text x="1060" y="325" text-anchor="middle" fill="#d1fae5" font-size="10">Binary Output:</text>
+    <text x="1060" y="342" text-anchor="middle" fill="#d1fae5" font-size="10">0 = Benign, 1 = Attack</text>
+    <text x="1060" y="370" text-anchor="middle" fill="#bbf7d0" font-size="11">Parameters: 2,885</text>
+  </g>
+
+  <!-- DETAILED PARAMETER BREAKDOWN -->
+  <g transform="translate(40, 410)">
+    <rect x="0" y="0" width="1110" height="230" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="555" y="28" text-anchor="middle" fill="white" font-size="15" font-weight="bold">Parameter Summary</text>
+
+    <g transform="translate(20, 45)">
+      <rect x="0" y="0" width="250" height="75" rx="8" fill="#1e293b" stroke="#6d28d9" stroke-width="1"/>
+      <text x="125" y="22" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="bold">LSTM Layer 1</text>
+      <text x="125" y="42" text-anchor="middle" fill="#94a3b8" font-size="10">Input: 122  |  Units: 128</text>
+      <text x="125" y="58" text-anchor="middle" fill="#94a3b8" font-size="10">Gates: 4 × (122+128+1) × 128</text>
+      <text x="125" y="74" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="bold">128,000 parameters</text>
+    </g>
+
+    <g transform="translate(290, 45)">
+      <rect x="0" y="0" width="250" height="75" rx="8" fill="#1e293b" stroke="#6d28d9" stroke-width="1"/>
+      <text x="125" y="22" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="bold">LSTM Layer 2</text>
+      <text x="125" y="42" text-anchor="middle" fill="#94a3b8" font-size="10">Input: 128  |  Units: 64</text>
+      <text x="125" y="58" text-anchor="middle" fill="#94a3b8" font-size="10">Gates: 4 × (128+64+1) × 64</text>
+      <text x="125" y="74" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="bold">49,408 parameters</text>
+    </g>
+
+    <g transform="translate(560, 45)">
+      <rect x="0" y="0" width="250" height="75" rx="8" fill="#1e293b" stroke="#059669" stroke-width="1"/>
+      <text x="125" y="22" text-anchor="middle" fill="#34d399" font-size="12" font-weight="bold">Dense Layer</text>
+      <text x="125" y="42" text-anchor="middle" fill="#94a3b8" font-size="10">64→32 + 32→1</text>
+      <text x="125" y="58" text-anchor="middle" fill="#94a3b8" font-size="10">Dense: (64+1)×32 + (32+1)×1</text>
+      <text x="125" y="74" text-anchor="middle" fill="#34d399" font-size="12" font-weight="bold">2,081 + 33 = 2,114</text>
+    </g>
+
+    <g transform="translate(830, 45)">
+      <rect x="0" y="0" width="250" height="75" rx="8" fill="#1e293b" stroke="#0891b2" stroke-width="1"/>
+      <text x="125" y="22" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="bold">BatchNorm</text>
+      <text x="125" y="42" text-anchor="middle" fill="#94a3b8" font-size="10">32×2 = 64 (γ + β)</text>
+      <text x="125" y="58" text-anchor="middle" fill="#94a3b8" font-size="10">Running mean/var: 64</text>
+      <text x="125" y="74" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="bold">771 parameters</text>
+    </g>
+
+    <g transform="translate(20, 140)">
+      <rect x="0" y="0" width="1060" height="65" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1"/>
+      <text x="280" y="22" text-anchor="middle" fill="#fb923c" font-size="12" font-weight="bold">Dropout (×2)</text>
+      <text x="280" y="42" text-anchor="middle" fill="#94a3b8" font-size="10">20% of activations zeroed during training</text>
+      <text x="280" y="58" text-anchor="middle" fill="#94a3b8" font-size="10">No learnable parameters</text>
+
+      <text x="700" y="38" text-anchor="middle" fill="white" font-size="14" font-weight="bold">TOTAL: 128,000 + 49,408 + 2,114 + 771 = 180,293 parameters</text>
+    </g>
+  </g>
+</svg>

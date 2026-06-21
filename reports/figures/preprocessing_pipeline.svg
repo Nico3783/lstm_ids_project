@@ -1,0 +1,208 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 750" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="stageGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="dataGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="cleanGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+    <marker id="arrowW" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="750" fill="url(#bgGrad)" rx="12"/>
+
+  <text x="550" y="42" text-anchor="middle" fill="white" font-size="22" font-weight="bold">Data Preprocessing Pipeline</text>
+  <text x="550" y="66" text-anchor="middle" fill="#94a3b8" font-size="13">From Raw Network Traffic to Model-Ready Sequences</text>
+
+  <!-- STAGE 1: RAW DATA INGESTION -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="100" width="160" height="200" rx="10" fill="url(#dataGrad)" opacity="0.95"/>
+    <text x="120" y="125" text-anchor="middle" fill="#bfdbfe" font-size="11" font-weight="bold">STAGE 1</text>
+    <text x="120" y="145" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Raw Data</text>
+    <line x1="60" y1="155" x2="180" y2="155" stroke="#93c5fd" stroke-width="0.5"/>
+    <text x="120" y="175" text-anchor="middle" fill="#bfdbfe" font-size="10">• CSV files loaded</text>
+    <text x="120" y="192" text-anchor="middle" fill="#bfdbfe" font-size="10">• Headers mapped</text>
+    <text x="120" y="209" text-anchor="middle" fill="#bfdbfe" font-size="10">• dtypes inferred</text>
+    <text x="120" y="226" text-anchor="middle" fill="#bfdbfe" font-size="10">• Shape validated</text>
+    <text x="120" y="243" text-anchor="middle" fill="#bfdbfe" font-size="10">• Label column set</text>
+    <text x="120" y="275" text-anchor="middle" fill="#93c5fd" font-size="11">Output: raw DataFrame</text>
+  </g>
+
+  <line x1="200" y1="200" x2="230" y2="200" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowW)"/>
+
+  <!-- STAGE 2: CLEANING -->
+  <g filter="url(#shadow)">
+    <rect x="235" y="100" width="160" height="200" rx="10" fill="url(#stageGrad)" opacity="0.95"/>
+    <text x="315" y="125" text-anchor="middle" fill="#e0e7ff" font-size="11" font-weight="bold">STAGE 2</text>
+    <text x="315" y="145" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Data Cleaning</text>
+    <line x1="255" y1="155" x2="375" y2="155" stroke="#c7d2fe" stroke-width="0.5"/>
+    <text x="315" y="175" text-anchor="middle" fill="#c7d2fe" font-size="10">• Remove duplicates</text>
+    <text x="315" y="192" text-anchor="middle" fill="#c7d2fe" font-size="10">• Handle NaN/Inf</text>
+    <text x="315" y="209" text-anchor="middle" fill="#c7d2fe" font-size="10">• Drop label column</text>
+    <text x="315" y="226" text-anchor="middle" fill="#c7d2fe" font-size="10">• Drop unused cols</text>
+    <text x="315" y="243" text-anchor="middle" fill="#c7d2fe" font-size="10">• Log shape changes</text>
+    <text x="315" y="275" text-anchor="middle" fill="#c7d2fe" font-size="11">Output: clean DataFrame</text>
+  </g>
+
+  <line x1="395" y1="200" x2="425" y2="200" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowW)"/>
+
+  <!-- STAGE 3: ENCODING -->
+  <g filter="url(#shadow)">
+    <rect x="430" y="100" width="160" height="200" rx="10" fill="url(#stageGrad)" opacity="0.95"/>
+    <text x="510" y="125" text-anchor="middle" fill="#e0e7ff" font-size="11" font-weight="bold">STAGE 3</text>
+    <text x="510" y="145" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Feature Encoding</text>
+    <line x1="450" y1="155" x2="570" y2="155" stroke="#c7d2fe" stroke-width="0.5"/>
+    <text x="510" y="175" text-anchor="middle" fill="#c7d2fe" font-size="10">• Label encode cat.</text>
+    <text x="510" y="192" text-anchor="middle" fill="#c7d2fe" font-size="10">• Binary → numeric</text>
+    <text x="510" y="209" text-anchor="middle" fill="#c7d2fe" font-size="10">• Map attack labels</text>
+    <text x="510" y="226" text-anchor="middle" fill="#c7d2fe" font-size="10">• 5-class mapping</text>
+    <text x="510" y="243" text-anchor="middle" fill="#c7d2fe" font-size="10">• Verify no NaN</text>
+    <text x="510" y="275" text-anchor="middle" fill="#c7d2fe" font-size="11">Output: numeric features</text>
+  </g>
+
+  <line x1="590" y1="200" x2="620" y2="200" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowW)"/>
+
+  <!-- STAGE 4: SCALING -->
+  <g filter="url(#shadow)">
+    <rect x="625" y="100" width="160" height="200" rx="10" fill="url(#stageGrad)" opacity="0.95"/>
+    <text x="705" y="125" text-anchor="middle" fill="#e0e7ff" font-size="11" font-weight="bold">STAGE 4</text>
+    <text x="705" y="145" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Normalization</text>
+    <line x1="645" y1="155" x2="765" y2="155" stroke="#c7d2fe" stroke-width="0.5"/>
+    <text x="705" y="175" text-anchor="middle" fill="#c7d2fe" font-size="10">• MinMaxScaler [0,1]</text>
+    <text x="705" y="192" text-anchor="middle" fill="#c7d2fe" font-size="10">• Fit on train set</text>
+    <text x="705" y="209" text-anchor="middle" fill="#c7d2fe" font-size="10">• Transform all splits</text>
+    <text x="705" y="226" text-anchor="middle" fill="#c7d2fe" font-size="10">• Save scaler state</text>
+    <text x="705" y="243" text-anchor="middle" fill="#c7d2fe" font-size="10">• Prevent data leak</text>
+    <text x="705" y="275" text-anchor="middle" fill="#c7d2fe" font-size="11">Output: scaled [0,1]</text>
+  </g>
+
+  <line x1="785" y1="200" x2="815" y2="200" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowW)"/>
+
+  <!-- STAGE 5: SPLITTING -->
+  <g filter="url(#shadow)">
+    <rect x="820" y="100" width="160" height="200" rx="10" fill="url(#stageGrad)" opacity="0.95"/>
+    <text x="900" y="125" text-anchor="middle" fill="#e0e7ff" font-size="11" font-weight="bold">STAGE 5</text>
+    <text x="900" y="145" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Train/Val/Test Split</text>
+    <line x1="840" y1="155" x2="960" y2="155" stroke="#c7d2fe" stroke-width="0.5"/>
+    <text x="900" y="175" text-anchor="middle" fill="#c7d2fe" font-size="10">• 80% / 10% / 10%</text>
+    <text x="900" y="192" text-anchor="middle" fill="#c7d2fe" font-size="10">• Stratified split</text>
+    <text x="900" y="209" text-anchor="middle" fill="#c7d2fe" font-size="10">• No temporal leakage</text>
+    <text x="900" y="226" text-anchor="middle" fill="#c7d2fe" font-size="10">• Per-dataset save</text>
+    <text x="900" y="243" text-anchor="middle" fill="#c7d2fe" font-size="10">• Metadata logged</text>
+    <text x="900" y="275" text-anchor="middle" fill="#c7d2fe" font-size="11">Output: 3 splits</text>
+  </g>
+
+  <!-- ARROW DOWN -->
+  <line x1="900" y1="300" x2="900" y2="345" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowW)"/>
+
+  <!-- STAGE 6: SEQUENCE BUILDING -->
+  <g filter="url(#shadow)">
+    <rect x="820" y="350" width="160" height="180" rx="10" fill="url(#cleanGrad)" opacity="0.95"/>
+    <text x="900" y="375" text-anchor="middle" fill="#d1fae5" font-size="11" font-weight="bold">STAGE 6</text>
+    <text x="900" y="395" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Sequence Building</text>
+    <line x1="840" y1="405" x2="960" y2="405" stroke="#a7f3d0" stroke-width="0.5"/>
+    <text x="900" y="425" text-anchor="middle" fill="#d1fae5" font-size="10">• Sliding window: 10</text>
+    <text x="900" y="442" text-anchor="middle" fill="#d1fae5" font-size="10">• X: (N, 10, features)</text>
+    <text x="900" y="459" text-anchor="middle" fill="#d1fae5" font-size="10">• y: (N,) labels</text>
+    <text x="900" y="476" text-anchor="middle" fill="#d1fae5" font-size="10">• NumPy arrays saved</text>
+    <text x="900" y="515" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="bold">Model-Ready Data</text>
+  </g>
+
+  <!-- DATA FLOW VISUALIZATION -->
+  <g transform="translate(40, 380)">
+    <rect x="0" y="0" width="740" height="330" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="370" y="28" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Data Transformation Example</text>
+
+    <!-- BEFORE -->
+    <text x="185" y="65" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">Before Preprocessing</text>
+
+    <g transform="translate(20, 80)">
+      <rect x="0" y="0" width="340" height="210" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+      <text x="170" y="25" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="bold">Raw Sample Row</text>
+      <line x1="15" y1="35" x2="325" y2="35" stroke="#334155" stroke-width="0.5"/>
+      <text x="25" y="58" fill="#f87171" font-size="10">tcp</text>
+      <text x="100" y="58" fill="#f87171" font-size="10">ftp_data</text>
+      <text x="200" y="58" fill="#f87171" font-size="10">SF</text>
+      <text x="280" y="58" fill="#f87171" font-size="10">215</text>
+      <text x="25" y="80" fill="#94a3b8" font-size="9">Protocol</text>
+      <text x="100" y="80" fill="#94a3b8" font-size="9">Service</text>
+      <text x="200" y="80" fill="#94a3b8" font-size="9">Flag</text>
+      <text x="280" y="80" fill="#94a3b8" font-size="9">Bytes</text>
+      <text x="25" y="110" fill="#f87171" font-size="10">0.02</text>
+      <text x="100" y="110" fill="#f87171" font-size="10">0.01</text>
+      <text x="200" y="110" fill="#f87171" font-size="10">0.8</text>
+      <text x="280" y="110" fill="#f87171" font-size="10">0.5</text>
+      <text x="25" y="130" fill="#94a3b8" font-size="9">src_bytes</text>
+      <text x="100" y="130" fill="#94a3b8" font-size="9">dst_bytes</text>
+      <text x="200" y="130" fill="#94a3b8" font-size="9">count</text>
+      <text x="280" y="130" fill="#94a3b8" font-size="9">srv_count</text>
+      <line x1="15" y1="145" x2="325" y2="145" stroke="#334155" stroke-width="0.5"/>
+      <text x="170" y="168" text-anchor="middle" fill="#fca5a5" font-size="11">Label: normal (binary)</text>
+      <text x="170" y="188" text-anchor="middle" fill="#fca5a5" font-size="11">Label: Normal (multi)</text>
+      <text x="170" y="205" text-anchor="middle" fill="#94a3b8" font-size="10">String + mixed numeric types</text>
+    </g>
+
+    <!-- ARROW -->
+    <g transform="translate(370, 155)">
+      <rect x="0" y="0" width="80" height="55" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+      <text x="40" y="25" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="bold">CLEAN</text>
+      <text x="40" y="42" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="bold">ENCODE</text>
+    </g>
+
+    <!-- AFTER -->
+    <text x="555" y="65" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">After Preprocessing</text>
+
+    <g transform="translate(460, 80)">
+      <rect x="0" y="0" width="260" height="210" rx="8" fill="#1e293b" stroke="#059669" stroke-width="1"/>
+      <text x="130" y="25" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="bold">Cleaned &amp; Encoded Row</text>
+      <line x1="15" y1="35" x2="245" y2="35" stroke="#334155" stroke-width="0.5"/>
+      <text x="25" y="58" fill="#34d399" font-size="10">0.000</text>
+      <text x="95" y="58" fill="#34d399" font-size="10">1.000</text>
+      <text x="165" y="58" fill="#34d399" font-size="10">0.420</text>
+      <text x="25" y="80" fill="#94a3b8" font-size="9">proto_enc</text>
+      <text x="95" y="80" fill="#94a3b8" font-size="9">service_enc</text>
+      <text x="165" y="80" fill="#94a3b8" font-size="9">flag_enc</text>
+      <text x="25" y="110" fill="#34d399" font-size="10">0.002</text>
+      <text x="95" y="110" fill="#34d399" font-size="10">0.001</text>
+      <text x="165" y="110" fill="#34d399" font-size="10">0.800</text>
+      <text x="25" y="130" fill="#94a3b8" font-size="9">src_b_norm</text>
+      <text x="95" y="130" fill="#94a3b8" font-size="9">dst_b_norm</text>
+      <text x="165" y="130" fill="#94a3b8" font-size="9">count_norm</text>
+      <line x1="15" y1="145" x2="245" y2="145" stroke="#334155" stroke-width="0.5"/>
+      <text x="130" y="168" text-anchor="middle" fill="#34d399" font-size="11">All float64 (0-1 range)</text>
+      <text x="130" y="188" text-anchor="middle" fill="#34d399" font-size="11">Binary: 0 = Normal</text>
+      <text x="130" y="205" text-anchor="middle" fill="#34d399" font-size="11">Multi: 0 = Normal</text>
+    </g>
+
+    <!-- SEQUENCE VIS -->
+    <g transform="translate(20, 300)">
+      <text x="370" y="18" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Sliding Window → 3D Tensor (10 timesteps × 122 features)</text>
+    </g>
+  </g>
+
+  <!-- STRATIFIED SPLIT BAR -->
+  <g transform="translate(40, 380)" opacity="0">
+    <rect x="0" y="305" width="740" height="15" rx="4" fill="#1e293b"/>
+    <rect x="0" y="305" width="592" height="15" rx="4" fill="#3b82f6" opacity="0.7"/>
+    <text x="296" y="316" text-anchor="middle" fill="white" font-size="9">80% Train</text>
+    <rect x="592" y="305" width="74" height="15" rx="4" fill="#8b5cf6" opacity="0.7"/>
+    <text x="629" y="316" text-anchor="middle" fill="white" font-size="9">10% Val</text>
+    <rect x="666" y="305" width="74" height="15" rx="4" fill="#f97316" opacity="0.7"/>
+    <text x="703" y="316" text-anchor="middle" fill="white" font-size="9">10% Test</text>
+  </g>
+</svg>

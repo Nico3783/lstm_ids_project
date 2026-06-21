@@ -18,7 +18,9 @@ zip -r "$OUT" . \
   -x 'zSamples/*' \
   -x 'lstm_raw.zip' \
   -x 'lstm_project.zip' \
-  -x '.matplotlib_cache/*'
+  -x '.matplotlib_cache/*' \
+  -x 'journals/*' \
+  -x 'outputs/*'
 
 echo ""
 echo "Created: $OUT ($(du -h "$OUT" | cut -f1))"

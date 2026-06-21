@@ -22,7 +22,8 @@ models/final/
 models/baselines/
 
 # Reports (auto-generated)
-reports/figures/
+reports/figures/*.png
+reports/figures/*.pdf
 reports/logs/
 reports/metrics/
 reports/tables/

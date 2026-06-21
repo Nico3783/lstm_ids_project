@@ -1,0 +1,236 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 850" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="posGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+    <linearGradient id="negGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ef4444"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+    <linearGradient id="metricGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#4f46e5"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1100" height="850" fill="url(#bgGrad)" rx="12"/>
+
+  <text x="550" y="42" text-anchor="middle" fill="white" font-size="22" font-weight="bold">Evaluation Metrics Framework</text>
+  <text x="550" y="66" text-anchor="middle" fill="#94a3b8" font-size="13">Multi-Metric Assessment for Intrusion Detection Performance</text>
+
+  <!-- CONFUSION MATRIX -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="90" width="340" height="330" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="210" y="118" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Confusion Matrix</text>
+
+    <!-- Header -->
+    <text x="210" y="148" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="bold">PREDICTED LABEL</text>
+    <text x="100" y="145" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">Attack</text>
+    <text x="280" y="145" text-anchor="middle" fill="#60a5fa" font-size="12" font-weight="bold">Benign</text>
+
+    <!-- Side label -->
+    <text x="55" y="230" fill="#94a3b8" font-size="11" font-weight="bold" transform="rotate(-90,55,230)">ACTUAL LABEL</text>
+    <text x="75" y="195" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">Attack</text>
+    <text x="75" y="290" text-anchor="middle" fill="#60a5fa" font-size="12" font-weight="bold">Benign</text>
+
+    <!-- TP -->
+    <rect x="90" y="155" width="115" height="80" rx="6" fill="#166534" stroke="#22c55e" stroke-width="2"/>
+    <text x="147" y="185" text-anchor="middle" fill="#22c55e" font-size="24" font-weight="bold">TP</text>
+    <text x="147" y="208" text-anchor="middle" fill="#86efac" font-size="11">True Positive</text>
+    <text x="147" y="225" text-anchor="middle" fill="#4ade80" font-size="10">Correctly detected attack</text>
+
+    <!-- FP -->
+    <rect x="210" y="155" width="115" height="80" rx="6" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="267" y="185" text-anchor="middle" fill="#ef4444" font-size="24" font-weight="bold">FP</text>
+    <text x="267" y="208" text-anchor="middle" fill="#fca5a5" font-size="11">False Positive</text>
+    <text x="267" y="225" text-anchor="middle" fill="#f87171" font-size="10">Wrongly flagged benign</text>
+
+    <!-- FN -->
+    <rect x="90" y="240" width="115" height="80" rx="6" fill="#7f1d1d" stroke="#f97316" stroke-width="2"/>
+    <text x="147" y="270" text-anchor="middle" fill="#f97316" font-size="24" font-weight="bold">FN</text>
+    <text x="147" y="293" text-anchor="middle" fill="#fdba74" font-size="11">False Negative</text>
+    <text x="147" y="310" text-anchor="middle" fill="#fb923c" font-size="10">Missed attack</text>
+
+    <!-- TN -->
+    <rect x="210" y="240" width="115" height="80" rx="6" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="267" y="270" text-anchor="middle" fill="#22c55e" font-size="24" font-weight="bold">TN</text>
+    <text x="267" y="293" text-anchor="middle" fill="#86efac" font-size="11">True Negative</text>
+    <text x="267" y="310" text-anchor="middle" fill="#4ade80" font-size="10">Correctly identified benign</text>
+
+    <text x="210" y="355" text-anchor="middle" fill="#94a3b8" font-size="10">Where TP=Detected, FP=False Alarm, FN=Missed, TN=Correct Rejection</text>
+  </g>
+
+  <!-- METRIC FORMULAS -->
+  <g filter="url(#shadow)">
+    <rect x="400" y="90" width="320" height="330" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="560" y="118" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Performance Metrics</text>
+
+    <g transform="translate(420, 135)">
+      <rect x="0" y="0" width="280" height="55" rx="6" fill="#1e293b" stroke="#6366f1" stroke-width="1"/>
+      <text x="20" y="22" fill="#818cf8" font-size="11" font-weight="bold">Accuracy</text>
+      <text x="20" y="42" fill="#c7d2fe" font-size="12">= (TP + TN) / (TP + TN + FP + FN)</text>
+    </g>
+
+    <g transform="translate(420, 198)">
+      <rect x="0" y="0" width="280" height="55" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+      <text x="20" y="22" fill="#4ade80" font-size="11" font-weight="bold">Precision</text>
+      <text x="20" y="42" fill="#bbf7d0" font-size="12">= TP / (TP + FP)</text>
+    </g>
+
+    <g transform="translate(420, 261)">
+      <rect x="0" y="0" width="280" height="55" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+      <text x="20" y="22" fill="#fbbf24" font-size="11" font-weight="bold">Recall (Sensitivity)</text>
+      <text x="20" y="42" fill="#fde68a" font-size="12">= TP / (TP + FN)</text>
+    </g>
+
+    <g transform="translate(420, 324)">
+      <rect x="0" y="0" width="280" height="55" rx="6" fill="#1e293b" stroke="#ec4899" stroke-width="1"/>
+      <text x="20" y="22" fill="#f472b6" font-size="11" font-weight="bold">F1-Score</text>
+      <text x="20" y="42" fill="#fbcfe8" font-size="12">= 2 × (Precision × Recall) / (P + R)</text>
+    </g>
+  </g>
+
+  <!-- ROC CURVE -->
+  <g filter="url(#shadow)">
+    <rect x="730" y="90" width="330" height="330" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="895" y="118" text-anchor="middle" fill="white" font-size="14" font-weight="bold">ROC Curve</text>
+
+    <!-- Axes -->
+    <line x1="770" y1="395" x2="1020" y2="395" stroke="#475569" stroke-width="1.5"/>
+    <line x1="770" y1="145" x2="770" y2="395" stroke="#475569" stroke-width="1.5"/>
+
+    <text x="895" y="415" text-anchor="middle" fill="#94a3b8" font-size="10">False Positive Rate (1 - Specificity)</text>
+    <text x="758" y="270" fill="#94a3b8" font-size="10" transform="rotate(-90,758,270)">True Positive Rate (Recall)</text>
+
+    <!-- Diagonal (random) -->
+    <line x1="770" y1="395" x2="1020" y2="145" stroke="#475569" stroke-width="1" stroke-dasharray="6,4"/>
+    <text x="910" y="280" fill="#64748b" font-size="10" transform="rotate(-45,910,280)">Random (AUC=0.5)</text>
+
+    <!-- Good curve -->
+    <path d="M770,395 C770,380 770,200 820,160 C850,145 920,145 1020,145" fill="none" stroke="#22c55e" stroke-width="3"/>
+    <text x="870" y="210" fill="#22c55e" font-size="11" font-weight="bold">LSTM Model</text>
+    <text x="870" y="228" fill="#86efac" font-size="10">AUC = 0.967</text>
+
+    <!-- Area under curve -->
+    <path d="M770,395 C770,380 770,200 820,160 C850,145 920,145 1020,145 L1020,395 Z" fill="#22c55e" opacity="0.15"/>
+
+    <!-- Axis ticks -->
+    <text x="770" y="410" fill="#64748b" font-size="9">0.0</text>
+    <text x="890" y="410" fill="#64748b" font-size="9">0.5</text>
+    <text x="1015" y="410" fill="#64748b" font-size="9">1.0</text>
+    <text x="758" y="395" fill="#64748b" font-size="9" text-anchor="end">0.0</text>
+    <text x="758" y="270" fill="#64748b" font-size="9" text-anchor="end">0.5</text>
+    <text x="758" y="150" fill="#64748b" font-size="9" text-anchor="end">1.0</text>
+
+    <text x="895" y="435" text-anchor="middle" fill="#94a3b8" font-size="10">Optimal threshold at upper-left corner</text>
+  </g>
+
+  <!-- BASELINE COMPARISON TABLE -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="450" width="1020" height="340" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="550" y="480" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Baseline Model Comparison (UNSW-NB15 Dataset)</text>
+
+    <!-- Table Header -->
+    <rect x="60" y="500" width="160" height="35" rx="4" fill="#334155"/>
+    <text x="140" y="524" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Model</text>
+
+    <rect x="225" y="500" width="100" height="35" rx="4" fill="#334155"/>
+    <text x="275" y="524" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Accuracy</text>
+
+    <rect x="330" y="500" width="100" height="35" rx="4" fill="#334155"/>
+    <text x="380" y="524" text-anchor="middle" fill="white" font-size="11" font-weight="bold">F1 (Macro)</text>
+
+    <rect x="435" y="500" width="100" height="35" rx="4" fill="#334155"/>
+    <text x="485" y="524" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Precision</text>
+
+    <rect x="540" y="500" width="100" height="35" rx="4" fill="#334155"/>
+    <text x="590" y="524" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Recall</text>
+
+    <rect x="645" y="500" width="100" height="35" rx="4" fill="#334155"/>
+    <text x="695" y="524" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Training Time</text>
+
+    <rect x="750" y="500" width="150" height="35" rx="4" fill="#334155"/>
+    <text x="825" y="524" text-anchor="middle" fill="white" font-size="11" font-weight="bold">Notes</text>
+
+    <!-- LSTM Row -->
+    <rect x="60" y="540" width="160" height="40" rx="4" fill="#1e293b"/>
+    <text x="140" y="566" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="bold">LSTM (Ours)</text>
+    <rect x="225" y="540" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="275" y="566" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">96.8%</text>
+    <rect x="330" y="540" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="380" y="566" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">0.798</text>
+    <rect x="435" y="540" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="485" y="566" text-anchor="middle" fill="#fbbf24" font-size="12">0.915</text>
+    <rect x="540" y="540" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="590" y="566" text-anchor="middle" fill="#fbbf24" font-size="12">0.707</text>
+    <rect x="645" y="540" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="695" y="566" text-anchor="middle" fill="#94a3b8" font-size="11">~45 min</text>
+    <rect x="750" y="540" width="150" height="40" rx="4" fill="#1e293b"/>
+    <text x="825" y="566" text-anchor="middle" fill="#94a3b8" font-size="10">Deep learning baseline</text>
+
+    <!-- RF Row -->
+    <rect x="60" y="585" width="160" height="40" rx="4" fill="#1e293b"/>
+    <text x="140" y="611" text-anchor="middle" fill="#f97316" font-size="12" font-weight="bold">Random Forest</text>
+    <rect x="225" y="585" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="275" y="611" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">99.4%</text>
+    <rect x="330" y="585" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="380" y="611" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">0.990</text>
+    <rect x="435" y="585" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="485" y="611" text-anchor="middle" fill="#22c55e" font-size="12">0.994</text>
+    <rect x="540" y="585" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="590" y="611" text-anchor="middle" fill="#22c55e" font-size="12">0.994</text>
+    <rect x="645" y="585" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="695" y="611" text-anchor="middle" fill="#94a3b8" font-size="11">~2 min</text>
+    <rect x="750" y="585" width="150" height="40" rx="4" fill="#1e293b"/>
+    <text x="825" y="608" text-anchor="middle" fill="#ef4444" font-size="10">Best overall (RF wins on</text>
+    <text x="825" y="620" text-anchor="middle" fill="#ef4444" font-size="10">tabular features)</text>
+
+    <!-- SVM Row -->
+    <rect x="60" y="630" width="160" height="40" rx="4" fill="#1e293b"/>
+    <text x="140" y="656" text-anchor="middle" fill="#3b82f6" font-size="12" font-weight="bold">SVM (RBF)</text>
+    <rect x="225" y="630" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="275" y="656" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">48.7%</text>
+    <rect x="330" y="630" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="380" y="656" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">0.247</text>
+    <rect x="435" y="630" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="485" y="656" text-anchor="middle" fill="#ef4444" font-size="12">0.516</text>
+    <rect x="540" y="630" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="590" y="656" text-anchor="middle" fill="#ef4444" font-size="12">0.493</text>
+    <rect x="645" y="630" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="695" y="656" text-anchor="middle" fill="#94a3b8" font-size="11">~8 min</text>
+    <rect x="750" y="630" width="150" height="40" rx="4" fill="#1e293b"/>
+    <text x="825" y="653" text-anchor="middle" fill="#94a3b8" font-size="10">Poor — kernel scaling</text>
+    <text x="825" y="665" text-anchor="middle" fill="#94a3b8" font-size="10">issue suspected</text>
+
+    <!-- LR Row -->
+    <rect x="60" y="675" width="160" height="40" rx="4" fill="#1e293b"/>
+    <text x="140" y="701" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="bold">Logistic Reg.</text>
+    <rect x="225" y="675" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="275" y="701" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="bold">93.4%</text>
+    <rect x="330" y="675" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="380" y="701" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="bold">0.640</text>
+    <rect x="435" y="675" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="485" y="701" text-anchor="middle" fill="#fbbf24" font-size="12">0.712</text>
+    <rect x="540" y="675" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="590" y="701" text-anchor="middle" fill="#fbbf24" font-size="12">0.590</text>
+    <rect x="645" y="675" width="100" height="40" rx="4" fill="#1e293b"/>
+    <text x="695" y="701" text-anchor="middle" fill="#94a3b8" font-size="11">~30 sec</text>
+    <rect x="750" y="675" width="150" height="40" rx="4" fill="#1e293b"/>
+    <text x="825" y="701" text-anchor="middle" fill="#94a3b8" font-size="10">Linear baseline</text>
+
+    <!-- Annotation -->
+    <text x="550" y="745" text-anchor="middle" fill="#94a3b8" font-size="11">Note: LSTM captures temporal patterns in sequential data; RF excels on static tabular features. SVM performance suggests</text>
+    <text x="550" y="763" text-anchor="middle" fill="#94a3b8" font-size="11">feature scaling issues with RBF kernel. LR provides linear baseline for comparison.</text>
+
+    <!-- Highlight box for key insight -->
+    <rect x="60" y="770" width="980" height="15" rx="3" fill="#1e293b" opacity="0"/>
+  </g>
+</svg>

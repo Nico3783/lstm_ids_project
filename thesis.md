@@ -23,45 +23,37 @@ Network intrusion detection remains a pressing challenge for organisations that 
 
 ## CHAPTER 1: INTRODUCTION
 
-### 1.1 Background of the Study
+### 1.1 Preamble
 
 The rapid expansion of digital infrastructure across Nigerian organisations — spanning banking, telecommunications, healthcare, and government services — has created a networked environment where data flows continuously between interconnected systems. This connectivity, while essential for operational efficiency, has simultaneously expanded the attack surface available to malicious actors. Cybercriminals now deploy increasingly sophisticated techniques to breach network perimeters, exfiltrate sensitive information, and disrupt critical services, with both the frequency and complexity of these incidents following a concerning upward trajectory (Akinwale & Adeyemi, 2020).
 
-Intrusion detection systems represent one of the most fundamental defensive mechanisms in any cybersecurity architecture. These systems function as continuous monitors of network traffic, scrutinising data flows for patterns that deviate from established norms or match known threat signatures. The earliest academic treatment of this concept, Denning's (1987) real-time intrusion detection model, proposed a deceptively elegant approach: rather than cataloguing every conceivable attack pattern, a system could characterise normal network behaviour and raise alerts when observed activity diverges significantly from that baseline. This shift in perspective — from rule-based pattern matching to deviation-based anomaly detection — established the conceptual foundation upon which modern systems still operate, though the sophistication of implementation has advanced considerably.
+This research project provides several benefits for Nigerian academia, industry, and governmental institutions. Academic researchers gain access to a documented methodology and empirical evidence supporting LSTM-based intrusion detection, contributing to the growing body of knowledge on deep learning applications in network security — a relatively new research direction within Nigerian academia that offers opportunities for graduate students and early-career investigators. Industry practitioners, particularly security analysts operating in Nigerian environments where network security challenges are acute, benefit from a detection system capable of identifying both novel and established attack patterns using cost-effective open-source tools. At a broader level, the study addresses a recognised limitation in current intrusion detection systems: the inability to properly utilise temporal dependency information from network traffic when detecting multi-stage modern attacks.
+
+This thesis documents the design, implementation, and evaluation of a deep learning intrusion detection system using Long Short-Term Memory networks. The research is structured into five chapters. Chapter One establishes the problem context, articulates the research motivation and objectives, and introduces the methodological approach. Chapter Two provides a comprehensive literature review tracing the evolution of intrusion detection from rule-based methods through machine learning approaches to contemporary deep learning techniques. Chapter Three details the research methodology, including experimental design, mathematical formulations, system architecture, and evaluation metrics. Chapter Four presents the experimental implementation and results across three benchmark datasets. Chapter Five synthesises the study's contributions, presents conclusions drawn from the experimental evidence, and identifies directions for future research.
+
+### 1.2 Background
+
+Network security presents a critical concern for Nigerian organisations, and intrusion detection systems occupy a central position in most defensive strategies. Intrusion detection systems function as continuous monitors of network traffic, scrutinising data flows for patterns that deviate from established norms or match known threat signatures. The earliest academic treatment of this concept, Denning's (1987) real-time intrusion detection model, proposed a deceptively elegant approach: rather than cataloguing every conceivable attack pattern, a system could characterise normal network behaviour and raise alerts when observed activity diverges significantly from that baseline. This shift in perspective — from rule-based pattern matching to deviation-based anomaly detection — established the conceptual foundation upon which modern systems still operate, though the sophistication of implementation has advanced considerably.
 
 Traditional signature-based intrusion detection systems identify malicious traffic by comparing incoming packets against databases of previously characterised attack signatures (Denning, 1987). This approach functions effectively against documented threats, but encounters a fundamental limitation when confronting novel attack variants or polymorphic malware that modifies its structural characteristics while preserving its destructive intent. Maintaining an up-to-date signature database demands continuous expert analysis and manual curation, a resource-intensive process that introduces unavoidable latency between the emergence of a new threat and the availability of its corresponding detection signature. In Nigerian organisational contexts, where dedicated cybersecurity personnel may be scarce and vendor support infrastructure unreliable, this maintenance burden represents a practical barrier to effective deployment (Akinwale & Adeyemi, 2020).
 
 The application of machine learning techniques to intrusion detection has yielded substantial improvements over purely signature-based approaches. Algorithms such as decision trees, support vector machines, and random forests demonstrated the capacity to learn discriminative patterns from labelled network traffic data, enabling detection of previously unseen attack variants that share statistical similarities with known threats (Othman et al., 2018; Tama et al., 2019). However, these conventional classifiers operate under a structural assumption that fundamentally limits their effectiveness: they treat each network observation as an independent data point, ignoring the temporal relationships between successive events that characterise real intrusion sequences. Distributed denial of service attacks, for instance, manifest as coordinated packet transmission patterns distributed across time; port scanning attacks proceed through systematic sequential probes. When a classifier cannot represent these temporal dependencies, its detection accuracy degrades precisely on the attack categories that present the greatest operational risk.
 
-Deep learning architectures have introduced a qualitatively different approach to this problem. Recurrent neural networks, and specifically Long Short-Term Memory (LSTM) networks proposed by Hochreiter and Schmidhuber (1997), are architecturally designed to process sequential data while retaining information from earlier time steps through learned gating mechanisms. These gating operations — input, forget, and output gates — regulate the flow of information through the network's internal memory cells, enabling the model to capture temporal patterns that span hundreds or thousands of sequential events (Sherstinsky, 2020). For intrusion detection, this capability aligns directly with the temporal nature of network attacks, where the sequence of actions comprising an intrusion may unfold across multiple connections or packets.
+Machine learning has partially addressed these shortcomings but introduces its own set of challenges. Conventional classifiers such as support vector machines and ensemble methods typically treat network traffic observations as independent and identically distributed, thereby ignoring the temporal dependencies inherent in actual network communication patterns (Kasongo & Sun, 2020). In practice, intrusions rarely appear as isolated anomalies. A distributed denial of service attack involves sustained coordinated packet transmission over time; a probing attack systematically scans ports in sequential bursts. When models cannot represent these temporal patterns, the consequences are measurable: elevated false positive rates, reduced detection accuracy, and degraded performance on precisely the attack categories that pose the greatest danger. High false alarm rates carry their own operational costs. When a detection system flags excessive benign activities as malicious, security personnel experience alert fatigue, investigations consume unnecessary resources, and institutional trust in the system erodes. Equally damaging is the converse problem — false negatives, where genuine attacks slip through undetected, exposing organisations to potentially devastating breaches.
 
-This study pursues the application of LSTM networks to the design and implementation of a deep learning intrusion detection system capable of classifying network traffic as normal or malicious based on learned temporal patterns. The system is evaluated across three established benchmark datasets — NSL-KDD, CICIDS2017, and UNSW-NB15 — each presenting distinct challenges in terms of feature dimensionality, attack diversity, and class distribution. Implementation uses Python with TensorFlow/Keras and is designed to be reproducible using open-source tools accessible to researchers and practitioners in resource-constrained environments.
+Ogunleye and Owolabi (2021) observed that the Nigerian cybersecurity environment faces compounding difficulties, including limited access to labelled training data representative of local network environments and insufficient computational infrastructure to support sophisticated detection models at scale. Striking the appropriate balance between sensitivity and specificity remains an unresolved challenge that demands architectural innovations beyond what conventional classifiers can provide.
 
-### 1.2 Problem Statement
+### 1.3 Research Motivation
 
-Network security presents a critical concern for Nigerian organisations, and intrusion detection systems occupy a central position in most defensive strategies. Despite decades of research and commercial development, existing IDS implementations continue to exhibit limitations that compromise their practical effectiveness. Signature-based systems, which remain prevalent in commercial deployments, are reactive by nature — they identify only threats that have been previously characterised and catalogued, rendering them largely ineffective against zero-day exploits and attack variants not yet represented in any signature database (Tavallaee et al., 2009). Given the rapid evolution of the threat landscape, this dependency on prior knowledge constitutes a structural vulnerability rather than a minor inconvenience.
+Deep learning architectures have introduced a qualitatively different approach to the intrusion detection problem. Recurrent neural networks, and specifically Long Short-Term Memory (LSTM) networks proposed by Hochreiter and Schmidhuber (1997), are architecturally designed to process sequential data while retaining information from earlier time steps through learned gating mechanisms. These gating operations — input, forget, and output gates — regulate the flow of information through the network's internal memory cells, enabling the model to capture temporal patterns that span hundreds or thousands of sequential events (Sherstinsky, 2020). For intrusion detection, this capability aligns directly with the temporal nature of network attacks, where the sequence of actions comprising an intrusion may unfold across multiple connections or packets.
 
-Machine learning has partially addressed these shortcomings but introduces its own set of challenges. Conventional classifiers such as support vector machines and ensemble methods typically treat network traffic observations as independent and identically distributed, thereby ignoring the temporal dependencies inherent in actual network communication patterns (Kasongo & Sun, 2020). In practice, intrusions rarely appear as isolated anomalies. A distributed denial of service attack involves sustained coordinated packet transmission over time; a probing attack systematically scans ports in sequential bursts. When models cannot represent these temporal patterns, the consequences are measurable: elevated false positive rates, reduced detection accuracy, and degraded performance on precisely the attack categories that pose the greatest danger.
+The choice of LSTM over other deep learning architectures is motivated by three considerations. First, LSTM networks possess an inherent capacity for temporal modelling that convolutional networks and feedforward architectures lack, making them structurally suited to the sequential nature of network traffic. Second, the gating mechanism addresses the vanishing gradient problem that plagued earlier recurrent architectures, enabling effective learning across extended sequences (Hochreiter & Schmidhuber, 1997). Third, existing empirical studies have demonstrated competitive performance of LSTM-based systems on benchmark intrusion detection datasets, establishing a foundation upon which the present study builds (Kasongo & Sun, 2020; Kim et al., 2014).
 
-High false alarm rates carry their own operational costs. When a detection system flags excessive benign activities as malicious, security personnel experience alert fatigue, investigations consume unnecessary resources, and institutional trust in the system erodes. Equally damaging is the converse problem — false negatives, where genuine attacks slip through undetected, exposing organisations to potentially devastating breaches. Striking the appropriate balance between sensitivity and specificity remains an unresolved challenge. Ogunleye and Owolabi (2021) observed that the Nigerian cybersecurity environment faces compounding difficulties, including limited access to labelled training data representative of local network environments and insufficient computational infrastructure to support sophisticated detection models at scale.
+Despite these demonstrated advantages, no comprehensive study has systematically evaluated LSTM-based intrusion detection across the three most widely used benchmark datasets — NSL-KDD, CICIDS2017, and UNSW-NB15 — using a consistent preprocessing pipeline and evaluation protocol. This gap limits the ability of practitioners to make informed comparisons across datasets and hinders the identification of dataset-specific performance characteristics. Furthermore, the Nigerian context presents unique challenges that have not been addressed in the existing literature: limited computational infrastructure, scarce labelled datasets representative of local network environments, and the absence of documented, reproducible methodologies that researchers and practitioners can adopt without proprietary resources.
 
-This study addresses these problems directly. By designing and implementing an intrusion detection system grounded in LSTM networks, the research aims to capture the temporal structure of network traffic in ways that conventional classifiers cannot. Using multiple benchmark datasets and rigorous evaluation protocols, the study works toward a detection framework that is both accurate and generalisable — one capable of identifying known and novel attack patterns alike, and contributing meaningfully to network security practice in Nigeria and beyond.
+This study pursues the application of LSTM networks to the design and implementation of a deep learning intrusion detection system capable of classifying network traffic as normal or malicious based on learned temporal patterns. By evaluating the system across three established benchmark datasets using rigorous, reproducible protocols, the research works toward a detection framework that is both accurate and generalisable — one capable of identifying known and novel attack patterns alike, and contributing meaningfully to network security practice in Nigeria and beyond. The implementation uses Python with TensorFlow/Keras and is designed to be reproducible using open-source tools accessible to researchers and practitioners in resource-constrained environments.
 
-### 1.3 Research Questions
-
-The following research questions guide the investigation:
-
-1. How can Long Short-Term Memory networks be effectively designed and implemented to model temporal dependencies in network traffic data for intrusion detection purposes?
-
-2. What preprocessing techniques are most appropriate for transforming raw network traffic datasets into formats suitable for training deep learning models, specifically addressing categorical encoding, numerical normalisation, and class imbalance issues?
-
-3. How does the performance of the proposed LSTM-based intrusion detection system, measured in terms of accuracy, precision, recall, and F1-score, compare with existing machine learning approaches documented in the literature?
-
-4. What architectural configurations of LSTM networks — including the number of layers, units per layer, dropout rates, and activation functions — yield optimal detection performance on benchmark datasets including NSL-KDD, CICIDS2017, and UNSW-NB15?
-
-5. To what extent can the proposed deep learning intrusion detection system generalise across different network traffic datasets, demonstrating robustness to variations in network environments and attack distributions?
-
-### 1.4 Research Aim and Objectives
+### 1.4 Objectives
 
 #### 1.4.1 Research Aim
 
@@ -79,67 +71,95 @@ In this study, the following research objectives are set to achieve the above st
 
 4. Evaluate and test the performance of the proposed LSTM-based intrusion detection system using classification evaluation metrics and compare it with conventional machine learning classifiers.
 
-### 1.5 Hypotheses
+#### 1.4.3 Research Questions
+
+The following research questions guide the investigation:
+
+1. How can Long Short-Term Memory networks be effectively designed and implemented to model temporal dependencies in network traffic data for intrusion detection purposes?
+
+2. What preprocessing techniques are most appropriate for transforming raw network traffic datasets into formats suitable for training deep learning models, specifically addressing categorical encoding, numerical normalisation, and class imbalance issues?
+
+3. How does the performance of the proposed LSTM-based intrusion detection system, measured in terms of accuracy, precision, recall, and F1-score, compare with existing machine learning approaches documented in the literature?
+
+4. What architectural configurations of LSTM networks — including the number of layers, units per layer, dropout rates, and activation functions — yield optimal detection performance on benchmark datasets including NSL-KDD, CICIDS2017, and UNSW-NB15?
+
+5. To what extent can the proposed deep learning intrusion detection system generalise across different network traffic datasets, demonstrating robustness to variations in network environments and attack distributions?
+
+#### 1.4.4 Hypotheses
 
 **Null Hypothesis (H₀):** The proposed LSTM-based network intrusion detection system and conventional machine learning classifiers show no statistically significant difference in network intrusion detection capabilities.
 
 **Alternative Hypothesis (H₁):** The proposed LSTM-based network intrusion detection system shows a statistically significant superiority in network intrusion detection capabilities over conventional machine learning classifiers in terms of accuracy, precision, recall, and F1-score.
 
-### 1.6 Significance of the Study
+### 1.5 Methodology
 
-This research project provides several benefits for Nigerian academia, industry, and governmental institutions. Academic researchers gain access to a documented methodology and empirical evidence supporting LSTM-based intrusion detection, contributing to the growing body of knowledge on deep learning applications in network security — a relatively new research direction within Nigerian academia that offers opportunities for graduate students and early-career investigators.
+This section introduces the methodological approach adopted in this study, providing a conceptual overview of the experimental design, datasets, preprocessing pipeline, model architecture, and evaluation metrics. Full mathematical formulations and implementation details are presented in Chapter Three.
 
-Industry practitioners, particularly security analysts operating in Nigerian environments where network security challenges are acute, benefit from a detection system capable of identifying both novel and established attack patterns using cost-effective open-source tools. The implementation relies on Python, TensorFlow, and Keras rather than expensive proprietary security products, addressing the resource constraints that Akinwale and Adeyemi (2020) identified as a structural barrier to effective cybersecurity in Nigerian organisations.
+The study employs an experimental research design structured around the standard machine learning workflow for classification tasks. The approach is quantitative and systematic, with performance measured empirically using standard classification metrics. The experimental design enables systematic manipulation of independent variables — model architecture, hyperparameters, and preprocessing decisions — while measuring their effects on the well-defined dependent variable of intrusion detection performance.
 
-At a broader level, the study addresses a recognised limitation in current intrusion detection systems: the inability to properly utilise temporal dependency information from network traffic when detecting multi-stage modern attacks. By demonstrating the practical value of LSTM-based temporal modelling, the research may inform Nigerian policy makers in formulating robust network security standards and guide investment decisions regarding cybersecurity infrastructure.
+Three benchmark datasets are used: NSL-KDD, CICIDS2017, and UNSW-NB15. NSL-KDD contains 125,973 training records with 41 features across four attack categories (Probe, DoS, R2L, U2R). CICIDS2017 comprises approximately 2.8 million records with 80 bidirectional flow features representing modern attack types. UNSW-NB15 contains 2.54 million records with 49 features across nine attack families. These datasets were selected for their distinct characteristics in terms of feature dimensionality, attack diversity, and class distribution, enabling evaluation of generalisation across different network traffic environments.
 
-### 1.7 Scope and Limitations
+Preprocessing follows a consistent five-stage pipeline. First, data cleaning addresses missing values and inconsistent records. Second, categorical features are transformed using one-hot encoding, expanding the feature space from the original dimensions to approximately 122 dimensions for NSL-KDD. Third, continuous features are normalised to the [0, 1] range using Min-Max scaling:
 
-This research work pertains to the design and implementation of a network-based intrusion detection system using a Long Short-Term Memory deep learning network which identifies network traffic as normal or malicious through multi-class classification. The study uses three publicly available benchmark datasets: NSL-KDD, CICIDS2017, and UNSW-NB15, each containing labelled network traffic with both normal and various attack categories (Probe, DoS, U2R, R2L, and others). Implementation uses the Python programming language with deep learning libraries (TensorFlow, Keras, PyTorch) and supporting libraries (NumPy, Pandas, Scikit-learn, Matplotlib, Seaborn). Version control is managed through Git, and architectural diagrams are produced using Microsoft Visio, Lucidchart, and Draw.io.
+$$x'_i = \frac{x_i - x_{\min}}{x_{\max} - x_{\min}} \qquad (1)$$
 
-Several limitations constrain the present study. The benchmark datasets were generated in controlled laboratory environments and do not necessarily reflect Nigerian network traffic patterns, serving instead as representative sources of different attack classes. The NSL-KDD dataset, despite its widespread use in the literature, is based on data simulation from the late 1990s and contains traffic characteristics that differ substantially from contemporary network environments. Experiments were conducted in a controlled computational environment, so results may differ from those obtained in operational networks with high traffic volumes and dynamic conditions. Deep learning architectures beyond LSTM — including convolutional neural networks and Transformer models — were not evaluated, though these may offer complementary performance improvements. Additionally, comprehensive hyperparameter search was constrained by computational resource availability, and deployment and evaluation in a live network environment was not within the scope of this study.
+where $x_i$ is the original value, $x_{\min}$ and $x_{\max}$ are the minimum and maximum values computed on the training set, and $x'_i$ is the scaled output. Fourth, a sliding window of width $W = 10$ constructs temporal sequences:
 
-### 1.8 Definitions of Key Terms
+$$\mathbf{X}^{(k)} = X[k : k+W, :] \in \mathbb{R}^{W \times F} \qquad (2)$$
 
-- **IDS (Intrusion Detection System):** A device or software application that monitors network traffic or system activities for malicious activity or policy violations.
+$$y^{(k)} = y_{k+W-1} \qquad (3)$$
 
-- **LSTM (Long Short-Term Memory):** A recurrent neural network architecture specialised for learning long-term dependencies in sequential data, designed to mitigate the vanishing gradient problem found in conventional recurrent networks.
+where $k \in \{0, 1, \ldots, N - W\}$ and the label corresponds to the traffic class of the final time step. Fifth, data is split into training (70%), validation (15%), and test (15%) sets using stratified sampling to preserve class distributions.
 
-- **Deep Learning:** A subset of machine learning that employs multi-layered artificial neural networks for hierarchical feature extraction and information processing.
+The proposed model uses a two-layer stacked LSTM architecture. The first layer contains 128 units, producing a full output sequence:
 
-- **TensorFlow:** An open-source numerical computation library developed by Google, widely used for building and training deep learning models.
+$$\mathbf{H}^{(1)} = \text{LSTM}_{128}(\mathbf{X}) \in \mathbb{R}^{W \times 128} \qquad (4)$$
 
-- **Keras:** A high-level application programming interface that simplifies deep learning model development and can operate on top of multiple backend frameworks.
+Dropout with rate $\rho = 0.2$ is applied after the first LSTM layer:
 
-- **PyTorch:** An open-source deep learning framework developed by Meta, valued by researchers for its flexibility and dynamic computational graph capabilities.
+$$\hat{\mathbf{H}}^{(1)} = \text{Dropout}(\mathbf{H}^{(1)}, \rho) \qquad (5)$$
 
-- **NSL-KDD:** A corrected version of the KDD Cup 1999 IDS dataset that addresses redundant and invalid record issues present in the original.
+The second layer contains 64 units, distilling the sequence representation into a fixed-length vector:
 
-- **CICIDS2017:** A contemporary intrusion detection dataset developed by the Canadian Institute for Cybersecurity, incorporating diverse modern attack types with realistic traffic generation.
+$$\mathbf{h}^{(2)} = \text{LSTM}_{64}(\hat{\mathbf{H}}^{(1)}) \in \mathbb{R}^{64} \qquad (6)$$
 
-- **UNSW-NB15:** An intrusion detection dataset containing a hybrid of benign and malicious traffic records generated at the Australian Centre for Cyber Security.
+A dense hidden layer with 32 neurons, ReLU activation, and L2 regularisation ($\lambda = 0.001$) follows:
 
-- **Accuracy:** The proportion of correctly classified instances out of total predictions, measured as (TP + TN) / N.
+$$\mathbf{z} = \text{ReLU}(\mathbf{W}_d \hat{\mathbf{h}}^{(2)} + \mathbf{b}_d) \qquad (7)$$
 
-- **Precision:** The proportion of positive predictions that are actually correct, measuring the model's ability to avoid false alarms.
+Batch normalisation is applied before the output layer:
 
-- **Recall:** The proportion of actual positive instances correctly identified, measuring the model's ability to detect attacks that are present.
+$$\hat{z}_j = \gamma_j \frac{z_j - \mu_j}{\sqrt{\sigma_j^2 + \epsilon}} + \beta_j \qquad (8)$$
 
-- **F1-Score:** The harmonic mean of precision and recall, providing a balanced measure that accounts for both false positives and false negatives.
+The output layer uses softmax activation for multi-class classification:
 
-- **Confusion Matrix:** A tabular representation of classification performance showing counts of true positives, true negatives, false positives, and false negatives across all classes.
+$$\hat{y}_k = \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}}, \quad k = 1, \ldots, K \qquad (9)$$
 
-### 1.9 Structure of the Study
+The model is trained using the Adam optimiser with categorical cross-entropy loss:
 
-This research consists of five chapters. Chapter One establishes the problem context, articulates the research questions and objectives, and defines the scope and significance of the investigation.
+$$\mathcal{L}_{\text{CE}} = -\sum_{k=1}^{K} y_k \log(\hat{y}_k) \qquad (10)$$
 
-Chapter Two provides a comprehensive literature review tracing the evolution of intrusion detection from rule-based methods through machine learning approaches to contemporary deep learning techniques. The review examines existing empirical studies using LSTM-based systems, evaluates benchmark dataset characteristics, and identifies specific research gaps that the present study addresses.
+Performance is evaluated using four standard classification metrics. Accuracy measures the proportion of correctly classified instances:
 
-Chapter Three details the research methodology, including the experimental design, mathematical formulations underpinning the LSTM model, system architecture, data preprocessing procedures, model configuration, and evaluation metrics.
+$$\text{Accuracy} = \frac{1}{N} \sum_{i=1}^{N} \mathbb{1}(\hat{y}_i = y_i) \qquad (11)$$
 
-Chapter Four presents the experimental implementation and results, covering model training procedures, evaluation outcomes across all three benchmark datasets, confusion matrix analysis, and comparative discussion against baseline classifiers and findings reported in the literature.
+Precision measures the proportion of positive predictions that are correct:
 
-Chapter Five synthesises the study's contributions, presents conclusions drawn from the experimental evidence, and identifies directions for future research that build upon the present findings.
+$$\text{Precision}_k = \frac{\text{TP}_k}{\text{TP}_k + \text{FP}_k} \qquad (12)$$
+
+Recall measures the proportion of actual positive instances correctly identified:
+
+$$\text{Recall}_k = \frac{\text{TP}_k}{\text{TP}_k + \text{FN}_k} \qquad (13)$$
+
+F1-score provides the harmonic mean of precision and recall:
+
+$$\text{F1}_k = \frac{2 \cdot \text{Precision}_k \cdot \text{Recall}_k}{\text{Precision}_k + \text{Recall}_k} \qquad (14)$$
+
+Macro-averaged metrics are computed across all $K$ classes:
+
+$$\text{Metric}_{\text{macro}} = \frac{1}{K} \sum_{k=1}^{K} \text{Metric}_k \qquad (15)$$
+
+The LSTM-based system is benchmarked against Random Forest, Support Vector Machines, and standard Recurrent Neural Networks, ensuring performance claims are grounded in objective comparison rather than isolated observation. Full mathematical derivations, implementation details, and the complete experimental workflow are presented in Chapter Three.
 
 ---
 
@@ -347,7 +367,9 @@ The overall approach is quantitative and experimental, with performance measured
 
 The study adopts an experimental design structured around the standard machine learning workflow for classification tasks. This choice enables systematic manipulation of independent variables — model architecture, hyperparameters, and preprocessing decisions — while measuring their effects on the well-defined dependent variable of intrusion detection performance. The experimental workflow is organised into five phases: data acquisition and exploratory analysis, preprocessing and feature engineering, model design and implementation, training and optimisation, and evaluation and validation (Kasongo & Sun, 2020).
 
-![System Architecture](reports/figures/system_architecture.png)
+![Figure 3.1: Five-phase experimental methodology flowchart showing the sequential progression from data acquisition through exploratory analysis, preprocessing and feature engineering, model design and implementation, training and optimisation, to evaluation and validation.](reports/figures/methodology_flowchart.png)
+
+![Figure 3.2: System architecture of the proposed LSTM-based intrusion detection system, illustrating the complete data flow from raw network traffic acquisition through preprocessing, model training, and classification output.](reports/figures/system_architecture.png)
 
 A comparative analysis dimension is integrated into the design: the LSTM-based system is benchmarked against Random Forest, Support Vector Machines, and standard Recurrent Neural Networks, ensuring performance claims are grounded in objective comparison rather than isolated observation. A stratified cross-validation strategy reduces overfitting risk and verifies reliable performance across different data subsets. Critically, the design preserves the temporal ordering of network traffic sequences, since LSTM networks are architecturally designed to exploit exactly this sequential structure (Hochreiter & Schmidhuber, 1997). All experimental runs are tracked using Git, ensuring every code modification, configuration change, and result is traceable and recoverable.
 
@@ -359,7 +381,7 @@ This section presents the mathematical foundation underpinning the proposed LSTM
 
 All continuous features are normalised to the [0, 1] range using Min-Max scaling:
 
-$$x'_i = \frac{x_i - x_{\min}}{x_{\max} - x_{\min}}$$
+$$x'_i = \frac{x_i - x_{\min}}{x_{\max} - x_{\min}} \qquad (16)$$
 
 where $x_i$ is the original value of feature $i$, $x_{\min}$ and $x_{\max}$ are the minimum and maximum values computed exclusively on the training set, and $x'_i$ is the scaled output. Computing scaling parameters on the training set alone prevents information from validation or test sets from leaking into the training process.
 
@@ -367,9 +389,9 @@ where $x_i$ is the original value of feature $i$, $x_{\min}$ and $x_{\max}$ are 
 
 Given a flat feature matrix $X \in \mathbb{R}^{N \times F}$ and label vector $\mathbf{y} \in \mathbb{Z}^N$, a sliding window of width $W = 10$ and step size $s = 1$ constructs input sequences:
 
-$$\mathbf{X}^{(k)} = X[k : k+W, :] \in \mathbb{R}^{W \times F}$$
+$$\mathbf{X}^{(k)} = X[k : k+W, :] \in \mathbb{R}^{W \times F} \qquad (17)$$
 
-$$y^{(k)} = y_{k+W-1}$$
+$$y^{(k)} = y_{k+W-1} \qquad (18)$$
 
 where $k \in \{0, 1, \ldots, N - W\}$ and the label corresponds to the traffic class of the final time step in each window. The total number of sequences produced is $N - W + 1$. This temporal structuring is what distinguishes the preprocessing pipeline from those used with conventional classifiers. The window size of 10 was selected based on hyperparameter search results showing diminishing returns for longer windows given the feature characteristics of the datasets employed.
 
@@ -377,7 +399,7 @@ where $k \in \{0, 1, \ldots, N - W\}$ and the label corresponds to the traffic c
 
 Categorical features with $C$ unique values are transformed into $C$ binary columns. For a categorical feature $f$ with value $v \in \{v_1, v_2, \ldots, v_C\}$:
 
-$$\text{OHE}(f = v_j) = \mathbf{e}_j \in \{0, 1\}^C$$
+$$\text{OHE}(f = v_j) = \mathbf{e}_j \in \{0, 1\}^C \qquad (19)$$
 
 where $\mathbf{e}_j$ is the one-hot vector with a 1 in position $j$ and 0 elsewhere. All $C$ columns are retained because the features are nominal rather than ordinal. For NSL-KDD, the categorical features include protocol type ($C=3$), service ($C \approx 70$), and flag ($C \approx 11$), expanding the feature space from 41 to approximately 122 dimensions after encoding.
 
@@ -387,27 +409,27 @@ The Long Short-Term Memory unit at time step $t$ computes the following gating o
 
 **Forget gate** — controls retention of previous cell state information:
 
-$$\mathbf{f}_t = \sigma(\mathbf{W}_f [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_f)$$
+$$\mathbf{f}_t = \sigma(\mathbf{W}_f [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_f) \qquad (20)$$
 
 **Input gate** — controls the extent of cell state update:
 
-$$\mathbf{i}_t = \sigma(\mathbf{W}_i [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_i)$$
+$$\mathbf{i}_t = \sigma(\mathbf{W}_i [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_i) \qquad (21)$$
 
 **Candidate cell state** — proposed update to the cell state:
 
-$$\tilde{\mathbf{C}}_t = \tanh(\mathbf{W}_C [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_C)$$
+$$\tilde{\mathbf{C}}_t = \tanh(\mathbf{W}_C [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_C) \qquad (22)$$
 
 **Cell state update** — combines forget and input gate outputs:
 
-$$\mathbf{C}_t = \mathbf{f}_t \odot \mathbf{C}_{t-1} + \mathbf{i}_t \odot \tilde{\mathbf{C}}_t$$
+$$\mathbf{C}_t = \mathbf{f}_t \odot \mathbf{C}_{t-1} + \mathbf{i}_t \odot \tilde{\mathbf{C}}_t \qquad (23)$$
 
 **Output gate** — controls the hidden state output:
 
-$$\mathbf{o}_t = \sigma(\mathbf{W}_o [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_o)$$
+$$\mathbf{o}_t = \sigma(\mathbf{W}_o [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_o) \qquad (24)$$
 
 **Hidden state** — the output for the current time step:
 
-$$\mathbf{h}_t = \mathbf{o}_t \odot \tanh(\mathbf{C}_t)$$
+$$\mathbf{h}_t = \mathbf{o}_t \odot \tanh(\mathbf{C}_t) \qquad (25)$$
 
 In these equations, $\sigma(\cdot)$ denotes the logistic sigmoid activation, $\tanh(\cdot)$ is the hyperbolic tangent, $\odot$ represents element-wise multiplication, $\mathbf{W}_f, \mathbf{W}_i, \mathbf{W}_C, \mathbf{W}_o$ are weight matrices, $\mathbf{b}_f, \mathbf{b}_i, \mathbf{b}_C, \mathbf{b}_o$ are bias vectors, and $[\mathbf{h}_{t-1}, \mathbf{x}_t]$ denotes concatenation of the previous hidden state and current input.
 
@@ -415,95 +437,97 @@ In these equations, $\sigma(\cdot)$ denotes the logistic sigmoid activation, $\t
 
 The proposed model uses a two-layer stacked LSTM configuration. The first layer contains 128 units with `return_sequences=True`, producing a full output sequence:
 
-$$\mathbf{H}^{(1)} = \text{LSTM}_{128}(\mathbf{X}) \in \mathbb{R}^{W \times 128}$$
+$$\mathbf{H}^{(1)} = \text{LSTM}_{128}(\mathbf{X}) \in \mathbb{R}^{W \times 128} \qquad (26)$$
 
 Dropout with rate $\rho = 0.2$ is applied after the first LSTM layer:
 
-$$\hat{\mathbf{H}}^{(1)} = \text{Dropout}(\mathbf{H}^{(1)}, \rho)$$
+$$\hat{\mathbf{H}}^{(1)} = \text{Dropout}(\mathbf{H}^{(1)}, \rho) \qquad (27)$$
 
 The second layer contains 64 units with `return_sequences=False`, distilling the sequence representation into a fixed-length vector:
 
-$$\mathbf{h}^{(2)} = \text{LSTM}_{64}(\hat{\mathbf{H}}^{(1)}) \in \mathbb{R}^{64}$$
+$$\mathbf{h}^{(2)} = \text{LSTM}_{64}(\hat{\mathbf{H}}^{(1)}) \in \mathbb{R}^{64} \qquad (28)$$
 
 A second dropout layer ($\rho = 0.2$) follows, then a dense hidden layer with 32 neurons, ReLU activation, and L2 regularisation ($\lambda = 0.001$):
 
-$$\mathbf{z} = \text{ReLU}(\mathbf{W}_d \hat{\mathbf{h}}^{(2)} + \mathbf{b}_d)$$
+$$\mathbf{z} = \text{ReLU}(\mathbf{W}_d \hat{\mathbf{h}}^{(2)} + \mathbf{b}_d) \qquad (29)$$
 
 with the regularisation loss term:
 
-$$\mathcal{L}_{\text{reg}} = \lambda \|\mathbf{W}_d\|_F^2$$
+$$\mathcal{L}_{\text{reg}} = \lambda \|\mathbf{W}_d\|_F^2 \qquad (30)$$
 
 Batch normalisation is applied before the output layer:
 
-$$\hat{z}_j = \gamma_j \frac{z_j - \mu_j}{\sqrt{\sigma_j^2 + \epsilon}} + \beta_j$$
+$$\hat{z}_j = \gamma_j \frac{z_j - \mu_j}{\sqrt{\sigma_j^2 + \epsilon}} + \beta_j \qquad (31)$$
 
 where $\mu_j$ and $\sigma_j^2$ are the mini-batch mean and variance, $\gamma_j$ and $\beta_j$ are learnable scale and shift parameters, and $\epsilon = 10^{-3}$ ensures numerical stability.
 
 The output layer produces a probability distribution across $K$ classes ($K = 5$ for NSL-KDD) using softmax activation:
 
-$$\hat{y}_k = \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}}, \quad k = 1, \ldots, K$$
+$$\hat{y}_k = \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}}, \quad k = 1, \ldots, K \qquad (32)$$
 
 #### 3.3.6 Loss Function and Optimiser
 
 The model is trained using categorical cross-entropy loss. For a single sample with true label $y$ (one-hot encoded) and predicted probabilities $\hat{\mathbf{y}}$:
 
-$$\mathcal{L}_{\text{CE}} = -\sum_{k=1}^{K} y_k \log(\hat{y}_k)$$
+$$\mathcal{L}_{\text{CE}} = -\sum_{k=1}^{K} y_k \log(\hat{y}_k) \qquad (33)$$
 
 For a mini-batch of $B$ samples:
 
-$$\mathcal{L} = -\frac{1}{B} \sum_{b=1}^{B} \sum_{k=1}^{K} y_k^{(b)} \log(\hat{y}_k^{(b)})$$
+$$\mathcal{L} = -\frac{1}{B} \sum_{b=1}^{B} \sum_{k=1}^{K} y_k^{(b)} \log(\hat{y}_k^{(b)}) \qquad (34)$$
 
 The total loss combines cross-entropy with L2 regularisation:
 
-$$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{CE}} + \lambda \|\mathbf{W}_d\|_F^2$$
+$$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{CE}} + \lambda \|\mathbf{W}_d\|_F^2 \qquad (35)$$
 
 Training employs the Adam optimiser (Kingma & Ba, 2015) with adaptive learning rates:
 
-$$\mathbf{m}_t = \beta_1 \mathbf{m}_{t-1} + (1 - \beta_1) \mathbf{g}_t$$
+$$\mathbf{m}_t = \beta_1 \mathbf{m}_{t-1} + (1 - \beta_1) \mathbf{g}_t \qquad (36)$$
 
-$$\mathbf{v}_t = \beta_2 \mathbf{v}_{t-1} + (1 - \beta_2) \mathbf{g}_t^2$$
+$$\mathbf{v}_t = \beta_2 \mathbf{v}_{t-1} + (1 - \beta_2) \mathbf{g}_t^2 \qquad (37)$$
 
-$$\hat{\mathbf{m}}_t = \frac{\mathbf{m}_t}{1 - \beta_1^t}, \quad \hat{\mathbf{v}}_t = \frac{\mathbf{v}_t}{1 - \beta_2^t}$$
+$$\hat{\mathbf{m}}_t = \frac{\mathbf{m}_t}{1 - \beta_1^t}, \quad \hat{\mathbf{v}}_t = \frac{\mathbf{v}_t}{1 - \beta_2^t} \qquad (38)$$
 
-$$\boldsymbol{\theta}_t = \boldsymbol{\theta}_{t-1} - \eta \frac{\hat{\mathbf{m}}_t}{\sqrt{\hat{\mathbf{v}}_t} + \epsilon}$$
+$$\boldsymbol{\theta}_t = \boldsymbol{\theta}_{t-1} - \eta \frac{\hat{\mathbf{m}}_t}{\sqrt{\hat{\mathbf{v}}_t} + \epsilon} \qquad (39)$$
 
 with default parameters $\beta_1 = 0.9$, $\beta_2 = 0.999$, $\epsilon = 10^{-7}$, and initial learning rate $\eta = 0.001$.
 
 #### 3.3.7 Evaluation Metrics
 
-![Training and Loss Curves](reports/figures/training_accuracy_curve.png)
+![Figure 3.3: Training accuracy and loss curves for the proposed LSTM model on the NSL-KDD dataset, showing convergence behaviour over 100 epochs with early stopping at epoch 98.](reports/figures/training_accuracy_curve.png)
+
+![Figure 3.4: Evaluation metrics framework illustrating the relationships between accuracy, precision, recall, F1-score, confusion matrix, and ROC-AUC used to assess the proposed intrusion detection system.](reports/figures/evaluation_metrics_framework.png)
 
 **Accuracy** measures the proportion of correctly classified instances:
 
-$$\text{Accuracy} = \frac{1}{N} \sum_{i=1}^{N} \mathbb{1}(\hat{y}_i = y_i)$$
+$$\text{Accuracy} = \frac{1}{N} \sum_{i=1}^{N} \mathbb{1}(\hat{y}_i = y_i) \qquad (40)$$
 
 **Precision** for class $k$ measures the correctness of positive predictions:
 
-$$\text{Precision}_k = \frac{\text{TP}_k}{\text{TP}_k + \text{FP}_k}$$
+$$\text{Precision}_k = \frac{\text{TP}_k}{\text{TP}_k + \text{FP}_k} \qquad (41)$$
 
 **Recall** for class $k$ measures the completeness of positive detection:
 
-$$\text{Recall}_k = \frac{\text{TP}_k}{\text{TP}_k + \text{FN}_k}$$
+$$\text{Recall}_k = \frac{\text{TP}_k}{\text{TP}_k + \text{FN}_k} \qquad (42)$$
 
 **F1-Score** for class $k$ balances precision and recall:
 
-$$\text{F1}_k = \frac{2 \cdot \text{Precision}_k \cdot \text{Recall}_k}{\text{Precision}_k + \text{Recall}_k}$$
+$$\text{F1}_k = \frac{2 \cdot \text{Precision}_k \cdot \text{Recall}_k}{\text{Precision}_k + \text{Recall}_k} \qquad (43)$$
 
 Macro-averaged variants give equal weight to each class regardless of frequency, providing a fairer assessment when minority class detection is a priority:
 
-$$\text{Metric}_{\text{macro}} = \frac{1}{K} \sum_{k=1}^{K} \text{Metric}_k$$
+$$\text{Metric}_{\text{macro}} = \frac{1}{K} \sum_{k=1}^{K} \text{Metric}_k \qquad (44)$$
 
 The **confusion matrix** $\mathbf{C}$ records classification outcomes:
 
-$$C_{ij} = \sum_{l=1}^{N} \mathbb{1}(y_l = i \;\wedge\; \hat{y}_l = j)$$
+$$C_{ij} = \sum_{l=1}^{N} \mathbb{1}(y_l = i \;\wedge\; \hat{y}_l = j) \qquad (45)$$
 
 Row-normalised entries show per-class recall:
 
-$$\hat{C}_{ij} = \frac{C_{ij}}{n_i}$$
+$$\hat{C}_{ij} = \frac{C_{ij}}{n_i} \qquad (46)$$
 
 **ROC-AUC** is computed for each class in a one-versus-rest fashion:
 
-$$\text{AUC}_k = \int_0^1 \text{TPR}_k(t) \, d\text{FPR}_k(t)$$
+$$\text{AUC}_k = \int_0^1 \text{TPR}_k(t) \, d\text{FPR}_k(t) \qquad (47)$$
 
 where $\text{TPR}_k = \text{TP}_k / (\text{TP}_k + \text{FN}_k)$ and $\text{FPR}_k = \text{FP}_k / (\text{FP}_k + \text{TN}_k)$.
 
@@ -537,7 +561,7 @@ The three datasets were downloaded in CSV format from their respective official 
 
 The preprocessing pipeline transforms raw heterogeneous dataset files into temporally structured input sequences suitable for LSTM training, with each step applied consistently across all three datasets.
 
-![Preprocessing Pipeline](reports/figures/preprocessing_pipeline.png)
+![Figure 3.5: Data preprocessing pipeline illustrating the five-stage transformation from raw heterogeneous dataset files to temporally structured input sequences suitable for LSTM training.](reports/figures/preprocessing_pipeline.png)
 
 **Data Cleaning.** Missing and infinite values — particularly prevalent in CICIDS2017 — were addressed through mean imputation for continuous features and mode imputation for categorical ones. Duplicate records were identified and removed before any scaling or encoding to prevent bias introduction.
 
@@ -555,7 +579,7 @@ The preprocessing pipeline transforms raw heterogeneous dataset files into tempo
 
 The model was constructed using the Keras Sequential API with a two-layer stacked architecture designed to balance representational capacity against overfitting risk.
 
-![LSTM Architecture](reports/figures/lstm_architecture.png)
+![Figure 3.6: Architecture of the proposed two-layer stacked LSTM model, showing the input layer, LSTM layers with 128 and 64 units respectively, dropout regularisation, dense hidden layer with batch normalisation, and softmax output layer.](reports/figures/lstm_architecture.png)
 
 - **Input Layer:** Accepts sequences of shape $(10, n)$, where $n$ is the feature count after preprocessing (approximately 122 for NSL-KDD, 80 for CICIDS2017, 49 for UNSW-NB15).
 - **First LSTM Layer:** 128 units with tanh activation and sigmoid recurrent activation, `return_sequences=True`, dropout rate 0.2.
@@ -574,7 +598,7 @@ Hyperparameter tuning was conducted via grid search over: LSTM layer count (1, 2
 
 Class imbalance was addressed through inverse-frequency class weighting:
 
-$$w_k = \frac{N}{K \cdot n_k}$$
+$$w_k = \frac{N}{K \cdot n_k} \qquad (48)$$
 
 where $N$ is total training samples, $K$ is the number of classes, and $n_k$ is the sample count for class $k$. These weights scale the gradient contribution of each sample proportionally during training, encouraging the model to attend to underrepresented categories. Model checkpointing saved weights at each epoch where validation loss improved, ensuring the best generalising snapshot was used for evaluation.
 
@@ -657,3 +681,167 @@ Tama, B. A., Rania, M., & Lee, S. (2019). A comparative study of ensemble learni
 Tavallaee, M., Bagheri, E., Lu, W., & Ghorbani, A. A. (2009). A detailed analysis of the KDD CUP 99 data set. *Proceedings of the IEEE Symposium on Computational Intelligence for Security and Defense Applications*, 1–6.
 
 Xu, C. et al. (2025). A survey on deep learning for network intrusion detection. *IEEE Communications Surveys & Tutorials*, 27(1), 451–498.
+
+---
+
+## APPENDIX A: SCOPE AND LIMITATIONS
+
+This appendix defines the boundaries within which the research was conducted and acknowledges the limitations that constrain the generalisability of its findings.
+
+### A.1 Scope
+
+The study focuses exclusively on network-based intrusion detection using Long Short-Term Memory (LSTM) deep learning architectures. The scope encompasses the following dimensions:
+
+**Problem Domain.** The research addresses the classification of network traffic into normal and malicious categories, with multi-class classification distinguishing specific attack types within each benchmark dataset. The study does not address host-based intrusion detection, network traffic filtering, automated incident response, or threat hunting beyond classification.
+
+**Datasets.** The experimental evaluation employs three publicly available benchmark datasets: NSL-KDD, CICIDS2017, and UNSW-NB15. These datasets were selected for their distinct characteristics — feature dimensionality, attack diversity, and class distribution — rather than for representing any specific real-world network environment. The findings relate to performance on these benchmarks and should be interpreted accordingly.
+
+**Model Architecture.** The proposed system uses a two-layer stacked LSTM network with 128 and 64 units, dropout regularisation, batch normalisation, and a dense output layer with softmax activation. The study does not evaluate alternative recurrent architectures (GRU, Bidirectional LSTM), attention mechanisms, transformer-based models, or ensemble combinations.
+
+**Implementation.** The system is implemented in Python 3.11 using TensorFlow 2.16 and the Keras API, with Scikit-learn for preprocessing and evaluation utilities. The implementation is designed for reproducibility using open-source tools and does not require proprietary software or specialised hardware beyond a CUDA-capable GPU.
+
+**Evaluation.** Performance is measured using accuracy, precision, recall, F1-score, and ROC-AUC, with comparison against Random Forest, Support Vector Machines, and standard Recurrent Neural Network baselines. The study does not evaluate computational efficiency, inference latency, or deployment in operational network environments.
+
+### A.2 Limitations
+
+**Dataset Representativeness.** All three benchmark datasets are constructed under controlled or simulated conditions that do not fully replicate contemporary enterprise network traffic. NSL-KDD was generated in 1998 and predates modern network technologies. CICIDS2017, while more recent, was captured in a laboratory testbed with limited traffic diversity. UNSW-NB15 combines real and synthetic traffic that may not reflect production network patterns. Findings derived from these benchmarks provide performance estimates rather than guarantees of real-world detection capability.
+
+**Temporal Assumption.** The sliding window approach constructs sequences of 10 consecutive records, assuming that temporal patterns relevant to intrusion detection are captured within this window length. Attacks that unfold across sequences longer than 10 records, or that manifest within individual records without temporal context, may not be adequately modelled by this approach.
+
+**Class Imbalance.** Despite the use of inverse-frequency class weighting, the severe class imbalance present in all three datasets — particularly affecting minority attack categories such as U2R and R2L — may bias the model toward majority classes. The macro-averaged metrics provide a fairer assessment than aggregate accuracy, but minority class performance remains sensitive to the limited number of training examples available for rare attack types.
+
+**Computational Constraints.** Training deep learning models on large datasets (CICIDS2017 and UNSW-NB15 each contain over two million records) requires substantial computational resources. The reliance on cloud-based GPU instances for larger datasets introduces variability in training conditions and may affect reproducibility if different hardware configurations are used.
+
+**Generalisability.** The model is trained and evaluated within the closed world of each benchmark dataset. Its ability to generalise to network environments with different traffic distributions, attack methodologies, and feature characteristics is not directly evaluated. Transfer learning and domain adaptation are not addressed.
+
+**Scope of Comparison.** The baseline comparison includes Random Forest, Support Vector Machines, and standard RNN, representing conventional machine learning and simple deep learning approaches. The study does not compare against more recent deep learning architectures such as transformers, graph neural networks, or hybrid CNN-LSTM models, which may offer competitive or superior performance.
+
+---
+
+## APPENDIX B: DEFINITIONS OF KEY TERMS
+
+This appendix provides concise definitions of technical terms used throughout the thesis, organised alphabetically for reference.
+
+**Accuracy.** The proportion of all instances (both positive and negative) that are correctly classified by the model. Calculated as the sum of true positives and true negatives divided by the total number of instances.
+
+**Activation Function.** A mathematical function applied to the output of a neural network layer that introduces non-linearity, enabling the network to learn complex patterns. Common examples include ReLU, sigmoid, and softmax.
+
+**Adam Optimiser.** An adaptive learning rate optimisation algorithm that computes individual adaptive learning rates for different parameters using estimates of first and second moments of the gradients. Widely used in deep learning due to its computational efficiency and effectiveness.
+
+**Anomaly-based Detection.** An intrusion detection approach that identifies malicious activity by detecting deviations from established normal behaviour profiles, rather than matching against known attack signatures.
+
+**Backpropagation.** The algorithm used to train neural networks by computing gradients of the loss function with respect to each weight, propagating error signals backward through the network to update parameters.
+
+**Batch Normalisation.** A technique that normalises the inputs to each layer within a mini-batch, reducing internal covariate shift and accelerating training convergence.
+
+**Bidirectional LSTM.** A variant of LSTM that processes input sequences in both forward and reverse directions, capturing temporal dependencies running in both temporal directions.
+
+**Binary Classification.** A classification task with two possible output classes, such as normal versus malicious traffic.
+
+**Categorical Cross-Entropy.** The loss function used for multi-class classification problems, measuring the difference between the predicted probability distribution and the true class labels.
+
+**CICIDS2017.** A benchmark intrusion detection dataset developed by the Canadian Institute for Cybersecurity, containing over 2.8 million records with 80 bidirectional flow features representing modern attack types collected over five days.
+
+**Confusion Matrix.** A matrix summarising classification performance, with rows representing true classes and columns representing predicted classes, showing the distribution of correct and incorrect predictions across all categories.
+
+**Convolutional Neural Network (CNN).** A neural network architecture that applies learnable filters to局部 regions of the input, particularly effective at capturing spatial patterns in structured data.
+
+**DDoS (Distributed Denial of Service).** An attack in which multiple compromised systems coordinate to flood a target with traffic, overwhelming its capacity to respond to legitimate requests.
+
+**Deep Learning.** A subset of machine learning using neural networks with multiple layers to learn hierarchical representations of data, capable of automatically discovering features from raw inputs.
+
+**Denial of Service (DoS).** An attack that attempts to make a network service unavailable by overwhelming it with requests or exploiting vulnerabilities that cause it to crash.
+
+**Dropout.** A regularisation technique that randomly sets a fraction of neuron activations to zero during training, preventing co-adaptation of neurons and reducing overfitting.
+
+**Epoch.** One complete pass through the entire training dataset during model training.
+
+**F1-Score.** The harmonic mean of precision and recall, providing a single metric that balances both concerns. Particularly useful when class distributions are imbalanced.
+
+**False Negative.** An instance where the model incorrectly predicts the negative class when the true label is positive — a genuine attack classified as normal traffic.
+
+**False Positive.** An instance where the model incorrectly predicts the positive class when the true label is negative — normal traffic incorrectly flagged as malicious.
+
+**Feature.** An individual measurable property or characteristic of the data used as input to the model. In network intrusion detection, features may include connection duration, protocol type, packet counts, and byte counts.
+
+**Feature Engineering.** The process of selecting, transforming, or creating input features from raw data to improve model performance and learning efficiency.
+
+**Forgetting Gate.** The LSTM component that determines what information from the previous cell state should be discarded, using a sigmoid activation to produce values between 0 (complete遗忘) and 1 (complete retention).
+
+**Gating Mechanism.** The internal structure of LSTM units comprising input, forget, and output gates that regulate information flow through the memory cell.
+
+**Hidden State.** The output of an LSTM layer at each time step, representing the network's accumulated knowledge from processing the sequence up to that point.
+
+**HIDS (Host-based Intrusion Detection System).** An intrusion detection system installed on individual machines that monitors host-specific activity including system calls, file access, and process behaviour.
+
+**Hyperparameter.** A parameter set before training that controls the learning process, such as learning rate, batch size, number of layers, and dropout rate, as opposed to model parameters learned during training.
+
+**Inference.** The process of using a trained model to make predictions on new, unseen data.
+
+**Input Gate.** The LSTM component that controls how much of the proposed new information should be added to the cell state, using a sigmoid activation to scale the candidate update.
+
+**Keras.** A high-level neural network API designed for rapid experimentation, capable of running on top of TensorFlow, JAX, or PyTorch backends.
+
+**L2 Regularisation.** A technique that adds a penalty term proportional to the squared magnitude of model weights to the loss function, discouraging large weights and reducing overfitting.
+
+**Label.** The target variable or class associated with each training example, indicating the true category (e.g., normal, DoS, Probe).
+
+**Long Short-Term Memory (LSTM).** A recurrent neural network architecture designed to learn long-term dependencies in sequential data through gating mechanisms that regulate information flow through internal memory cells.
+
+**Loss Function.** A mathematical function that quantifies the difference between model predictions and true labels, providing the signal that guides parameter updates during training.
+
+**Machine Learning.** A subset of artificial intelligence in which systems learn patterns from data to make predictions or decisions without being explicitly programmed for each scenario.
+
+**Macro-Averaging.** An aggregation method that computes metrics independently for each class and then takes the unweighted mean, giving equal importance to all classes regardless of their frequency.
+
+**Multi-class Classification.** A classification task with more than two possible output categories, such as distinguishing among Normal, DoS, Probe, R2L, and U2R traffic classes.
+
+**NIDS (Network-based Intrusion Detection System).** An intrusion detection system that monitors network traffic at strategic points within the infrastructure, analysing packets for signs of malicious activity.
+
+**NSL-KDD.** A corrected version of the KDD Cup 1999 benchmark dataset for intrusion detection research, containing 125,973 training records and 22,544 test records with 41 features and four attack categories.
+
+**One-Hot Encoding.** A categorical encoding technique that represents each category as a binary vector with a single 1 and all other 0s, preventing ordinal assumptions on nominal variables.
+
+**Overfitting.** A condition in which a model learns training data noise or specific patterns that do not generalise to unseen data, resulting in high training performance but poor test performance.
+
+**Precision.** The proportion of positive predictions that are actually correct, measuring the reliability of positive predictions.
+
+**PyTorch.** An open-source deep learning framework developed by Meta AI, known for its dynamic computation graph and Pythonic interface.
+
+**Recall.** The proportion of actual positive instances that are correctly identified, measuring the completeness of positive detection.
+
+**Recurrent Neural Network (RNN).** A neural network architecture with connections that form directed cycles, enabling it to maintain hidden state across time steps for processing sequential data.
+
+**ReLU (Rectified Linear Unit).** An activation function defined as f(x) = max(0, x), widely used in deep learning due to its computational simplicity and effectiveness in mitigating the vanishing gradient problem.
+
+**Research Questions.** Specific questions that the study aims to answer through empirical investigation, guiding the scope and direction of the research.
+
+**ROC-AUC.** The Area Under the Receiver Operating Characteristic Curve, measuring the model's ability to distinguish between classes across all classification thresholds.
+
+**Signature-based Detection.** An intrusion detection approach that identifies known attacks by matching observed traffic against a database of pre-defined attack patterns.
+
+**Sliding Window.** A preprocessing technique that constructs sequential data by extracting overlapping subsets of consecutive records, preserving temporal relationships within each window.
+
+**Softmax Function.** An activation function that converts a vector of raw scores into a probability distribution, ensuring all outputs are non-negative and sum to one.
+
+**Stacked LSTM.** An architecture with multiple LSTM layers where the output sequence of one layer serves as input to the next, enabling hierarchical temporal feature learning.
+
+**Support Vector Machine (SVM).** A supervised learning algorithm that finds the optimal hyperplane separating classes in a high-dimensional feature space, effective for both linear and non-linear classification.
+
+**TensorFlow.** An open-source machine learning framework developed by Google, providing tools for building and training neural networks across multiple platforms.
+
+**Test Set.** A portion of the dataset held out entirely from training, used only for final unbiased evaluation of model performance.
+
+**True Negative.** An instance correctly predicted as the negative class by the model.
+
+**True Positive.** An instance correctly predicted as the positive class by the model.
+
+**UNSW-NB15.** A benchmark intrusion detection dataset developed at the Australian Centre for Cyber Security, containing approximately 2.54 million records with 49 features spanning nine attack families.
+
+**Validation Set.** A portion of the training data used during training to tune hyperparameters and monitor for overfitting, without being included in the actual model training.
+
+**Vanishing Gradient Problem.** The degradation of gradient magnitudes during backpropagation through deep or recurrent networks, causing early layers to learn very slowly or not at all.
+
+**Window Size.** The number of consecutive time steps included in each input sequence for the LSTM model, a key hyperparameter affecting temporal context and computational cost.
+
+**Zero-day Exploit.** An attack that exploits a previously unknown vulnerability before a patch or detection signature is available, representing the most challenging category for signature-based detection systems.

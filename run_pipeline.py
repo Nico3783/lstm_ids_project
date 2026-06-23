@@ -286,19 +286,59 @@ def main() -> None:
 
         # STAGE 6 — Split + save
         log_section_header(logger, "STAGE 6 — TRAIN / VAL / TEST SPLIT")
-        from src.data.split import split_and_save, get_split_summary
+        from src.data.split import (
+            split_and_save, split_and_save_disk, get_split_summary,
+        )
         from src.utils.serialization import save_preprocessing_artifacts
+        from src.utils.serialization import load_processed_arrays
         from sklearn.preprocessing import LabelEncoder
 
-        X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(
-            X_seq, y_seq,
-            output_dir=processed_dir,
-            train_ratio=cfg.split.train_ratio,
-            val_ratio=cfg.split.val_ratio,
-            test_ratio=cfg.split.test_ratio,
-            stratified=cfg.split.stratified,
-            dataset=args.dataset,
-        )
+        DISK_SPLIT_THRESHOLD = 200_000
+        use_disk_split = X_seq.shape[0] > DISK_SPLIT_THRESHOLD
+
+        if use_disk_split:
+            logger.info(
+                "Large dataset (%d seqs > %d) — using disk-based "
+                "split to avoid OOM.",
+                X_seq.shape[0], DISK_SPLIT_THRESHOLD,
+            )
+            # Free X_scaled before the split to reclaim RAM.
+            # The split function will handle X_seq internally.
+            del X_scaled
+            gc.collect()
+
+            split_and_save_disk(
+                X_seq, y_seq,
+                output_dir=processed_dir,
+                train_ratio=cfg.split.train_ratio,
+                val_ratio=cfg.split.val_ratio,
+                test_ratio=cfg.split.test_ratio,
+                stratified=cfg.split.stratified,
+                dataset=args.dataset,
+            )
+            del X_seq, y_seq
+            gc.collect()
+
+            # Reload splits from disk (they are small arrays
+            # that fit easily in RAM)
+            (
+                X_train, X_val, X_test,
+                y_train, y_val, y_test,
+            ) = load_processed_arrays(processed_dir)
+
+        else:
+            X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(
+                X_seq, y_seq,
+                output_dir=processed_dir,
+                train_ratio=cfg.split.train_ratio,
+                val_ratio=cfg.split.val_ratio,
+                test_ratio=cfg.split.test_ratio,
+                stratified=cfg.split.stratified,
+                dataset=args.dataset,
+            )
+            # Free sequence arrays from memory
+            del X_seq, y_seq, X_scaled, y
+            gc.collect()
 
         # Save preprocessing artifacts to dataset-specific models dir
         le = LabelEncoder()
@@ -310,10 +350,6 @@ def main() -> None:
             metadata=metadata,
             output_dir=out["models_final"],
         )
-
-        # Free sequence arrays from memory (splits are now in .npy files)
-        del X_seq, y_seq, X_scaled, y
-        gc.collect()
 
         # STAGE 7 — Hyperparameter tuning (optional)
         if args.tune or cfg.hyperparameter_tuning.enabled:

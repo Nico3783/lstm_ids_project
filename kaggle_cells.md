@@ -214,10 +214,9 @@ except Exception as e:
 ## Cell 6 — Save Results to Google Drive
 
 ```python
-import os, zipfile, subprocess
-from google.colab import drive  # Kaggle doesn't have this; skip if on Kaggle
+import os, zipfile
 
-# On Kaggle, download results manually or use this cell to zip them
+# Zip all results
 os.chdir("/kaggle/working")
 
 # Create a results archive

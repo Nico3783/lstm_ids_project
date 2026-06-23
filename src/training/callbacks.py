@@ -288,6 +288,7 @@ def build_callbacks(
 def build_callbacks_from_config(
     config: Optional[Any] = None,
     resume: bool = False,
+    output_dir: Optional[Path] = None,
 ) -> List[Any]:
     """
     Build callbacks by reading all parameters from the
@@ -302,6 +303,10 @@ def build_callbacks_from_config(
         Loaded automatically when not provided.
     resume : bool
         Passed to build_callbacks to determine append mode for CSVLogger.
+    output_dir : Path, optional
+        Dataset-specific output directory for checkpoints, logs,
+        and TensorBoard files.  When provided, overrides the
+        global ``CHECKPOINTS_DIR`` / ``LOGS_DIR`` defaults.
 
     Returns
     -------
@@ -316,13 +321,22 @@ def build_callbacks_from_config(
     mc = tr.model_checkpoint
     rl = tr.reduce_lr
 
-    ckpt_path = Path(mc.filepath)
+    # Resolve checkpoint path
+    ckpt_fname = Path(mc.filepath).name
+    if output_dir is not None:
+        ckpt_path = output_dir / "models" / "checkpoints" / ckpt_fname
+        log_dir = output_dir / "reports" / "logs"
+        tb_dir = output_dir / "reports" / "logs" / "tensorboard"
+    else:
+        ckpt_path = Path(mc.filepath)
+        log_dir = LOGS_DIR
+        tb_dir = TENSORBOARD_LOG_DIR
     ensure_dir(ckpt_path)
 
     return build_callbacks(
         checkpoint_path=ckpt_path,
-        log_dir=LOGS_DIR,
-        tensorboard_log_dir=TENSORBOARD_LOG_DIR,
+        log_dir=log_dir,
+        tensorboard_log_dir=tb_dir,
         early_stopping_patience=es.patience,
         early_stopping_monitor=es.monitor,
         restore_best_weights=es.restore_best_weights,

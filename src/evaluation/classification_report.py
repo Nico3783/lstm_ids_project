@@ -122,8 +122,9 @@ def generate_classification_report(
                     "Support": "",
                 })
 
-    ensure_dir(TABLES_DIR / "placeholder")
-    csv_path = TABLES_DIR / "final_metrics.csv"
+    csv_out = output_dir or TABLES_DIR
+    ensure_dir(csv_out / "placeholder")
+    csv_path = csv_out / "final_metrics.csv"
     pd.DataFrame(rows).to_csv(csv_path, index=False)
     logger.info("Classification report (csv) saved: %s", csv_path)
 

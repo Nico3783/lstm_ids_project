@@ -98,6 +98,7 @@ def train_lstm(
     save_dir: Optional[Path] = None,
     dataset: str = "nsl_kdd",
     resume: bool = False,
+    checkpoint_dir: Optional[Path] = None,
 ) -> TrainingResult:
     """
     Train the LSTM model on sequence data.
@@ -128,6 +129,8 @@ def train_lstm(
     dataset : str
     resume : bool
         If True, attempt to resume training from a checkpoint.
+    checkpoint_dir : Path, optional
+        Dataset-specific directory for checkpoints and logs.
 
     Returns
     -------
@@ -187,7 +190,11 @@ def train_lstm(
         class_weight_dict = get_class_weights(y_train)
 
     # ---- Callbacks ----
-    callbacks = build_callbacks_from_config(config, resume=(resume and checkpoint_loaded and initial_epoch > 0))
+    callbacks = build_callbacks_from_config(
+        config,
+        resume=(resume and checkpoint_loaded and initial_epoch > 0),
+        output_dir=checkpoint_dir,
+    )
 
     # ---- Log training configuration ----
     logger.info("Training configuration:")
@@ -420,6 +427,7 @@ def run_full_training(
     dataset: str = "nsl_kdd",
     config: Optional[Any] = None,
     resume: bool = False,
+    output_dir: Optional[Path] = None,
 ) -> Dict[str, TrainingResult]:
     """
     Run complete training for both the LSTM and all baseline
@@ -437,6 +445,10 @@ def run_full_training(
     config : AppConfig, optional
     resume : bool
         If True, attempt to resume training from a checkpoint.
+    output_dir : Path, optional
+        Dataset-specific output root.  When provided, models
+        are saved under ``output_dir/models/`` instead of the
+        global ``models/`` directory.
 
     Returns
     -------
@@ -447,16 +459,26 @@ def run_full_training(
         from src.config import get_config
         config = get_config()
 
+    # Resolve dataset-specific output paths
+    if output_dir is not None:
+        baselines_out = output_dir / "models" / "baselines"
+        final_out = output_dir / "models" / "final"
+        ckpts_out = output_dir / "models" / "checkpoints"
+    else:
+        baselines_out = None
+        final_out = None
+        ckpts_out = None
+
     results: Dict[str, TrainingResult] = {}
 
     # ---- Train baselines ----
     skip_baselines = False
     if resume:
-        from src.utils.paths import BASELINES_DIR
         # Check if baseline models exist
-        rf_path = BASELINES_DIR / "random_forest.pkl"
-        svm_path = BASELINES_DIR / "svm.pkl"
-        lr_path = BASELINES_DIR / "logistic_regression.pkl"
+        bl_check = baselines_out or BASELINES_DIR
+        rf_path = bl_check / "random_forest.pkl"
+        svm_path = bl_check / "svm.pkl"
+        lr_path = bl_check / "logistic_regression.pkl"
         if rf_path.exists() and svm_path.exists() and lr_path.exists():
             logger.info("Baseline models found on disk. Loading baseline models.")
             skip_baselines = True
@@ -483,7 +505,8 @@ def run_full_training(
 
     if not skip_baselines:
         baseline_results = train_baselines(
-            X_train, y_train, config=config
+            X_train, y_train, config=config,
+            save_dir=baselines_out,
         )
         results.update(baseline_results)
 
@@ -514,8 +537,10 @@ def run_full_training(
         batch_size=config.training.batch_size,
         use_class_weights=config.preprocessing.use_class_weights,
         config=config,
+        save_dir=final_out,
         dataset=dataset,
         resume=resume,
+        checkpoint_dir=ckpts_out,
     )
     results["lstm"] = lstm_result
 

@@ -130,6 +130,15 @@ def main() -> None:
     pipeline_timer = Timer("Full pipeline")
     pipeline_timer.start()
 
+    # Compute dataset-specific output directories
+    from src.utils.paths import get_dataset_output_dirs
+    out = get_dataset_output_dirs(args.dataset)
+    for subdir in ["root", "models_baselines", "models_final",
+                   "models_checkpoints", "figures", "tables", "metrics",
+                   "logs", "tensorboard", "predictions", "exported"]:
+        logger.debug("  out[%-20s] = %s", subdir, out[subdir])
+    logger.info("Dataset output root: %s", out["root"])
+
     # Compute dataset-specific processed data directory
     from src.utils.paths import get_processed_data_dir
     from src.utils.constants import (
@@ -196,7 +205,6 @@ def main() -> None:
         log_section_header(logger, "STAGE 2 — DATA LOADING")
         from src.data.loaders import load_dataset, get_dataset_summary
         from src.utils.helpers import save_json
-        from src.utils.paths import TABLES_DIR
 
         main_df, _ = load_dataset(
             args.dataset,
@@ -222,7 +230,7 @@ def main() -> None:
             )
 
         summary = get_dataset_summary(main_df, args.dataset)
-        save_json(summary, TABLES_DIR / "dataset_summary.json")
+        save_json(summary, out["tables"] / "dataset_summary.json")
         logger.info("Dataset loaded: %d rows.", len(main_df))
 
         # STAGE 3 — EDA
@@ -292,8 +300,7 @@ def main() -> None:
             dataset=args.dataset,
         )
 
-        # Save preprocessing artifacts to models/final/ as well
-        from src.utils.paths import FINAL_MODEL_DIR
+        # Save preprocessing artifacts to dataset-specific models dir
         le = LabelEncoder()
         le.classes_ = np.array(metadata["class_names"])
         save_preprocessing_artifacts(
@@ -301,7 +308,7 @@ def main() -> None:
             label_encoder=le,
             feature_names=feature_names,
             metadata=metadata,
-            output_dir=FINAL_MODEL_DIR,
+            output_dir=out["models_final"],
         )
 
         # Free sequence arrays from memory (splits are now in .npy files)
@@ -349,6 +356,7 @@ def main() -> None:
         dataset=args.dataset,
         config=cfg,
         resume=args.resume,
+        output_dir=out["root"],
     )
 
     # STAGE 9 — Evaluation
@@ -402,6 +410,7 @@ def main() -> None:
         class_names=class_names,
         dataset=args.dataset,
         model_name="LSTM",
+        output_dir=out["tables"],
     )
 
     # ROC curves
@@ -413,7 +422,10 @@ def main() -> None:
         class_names=class_names,
         dataset=args.dataset,
     )
-    save_roc_scores(roc_data)
+    save_roc_scores(
+        roc_data,
+        output_path=out["metrics"] / "roc_auc_scores.json",
+    )
 
     # Confusion matrix
     plot_confusion_matrix(
@@ -423,8 +435,14 @@ def main() -> None:
     )
 
     # Save all metrics
-    save_evaluation_results(all_metrics)
-    build_comparison_table(all_metrics)
+    save_evaluation_results(
+        all_metrics,
+        output_path=out["metrics"] / "evaluation_results.json",
+    )
+    build_comparison_table(
+        all_metrics,
+        output_path=out["tables"] / "baseline_metrics.csv",
+    )
 
     # STAGE 10 — Generate all Chapter 4 figures
     log_section_header(logger, "STAGE 10 — GENERATING REPORT FIGURES")
@@ -442,11 +460,16 @@ def main() -> None:
         class_names=class_names,
         input_shape=(cfg.sequence.window_size, X_train.shape[2]),
         n_classes=n_classes,
+        output_dir=out["figures"],
     )
 
     # STAGE 11 — Export ZIP
     log_section_header(logger, "STAGE 11 — EXPORTING RESULTS")
-    zip_path = export_chapter4_zip()
+    zip_path = export_chapter4_zip(
+        figures_dir=out["figures"],
+        tables_dir=out["tables"],
+        output_dir=out["exported"],
+    )
     logger.info("Chapter 4 ZIP: %s", zip_path)
 
     # DONE
@@ -460,11 +483,13 @@ def main() -> None:
                 all_metrics.get("LSTM", {}).get("f1_macro", 0))
     logger.info(
         "\nAll outputs saved to:\n"
-        "  Figures  : reports/figures/\n"
-        "  Tables   : reports/tables/\n"
-        "  Metrics  : reports/metrics/\n"
-        "  Model    : models/final/\n"
-        "  ZIP      : %s", zip_path,
+        "  Figures  : %s\n"
+        "  Tables   : %s\n"
+        "  Metrics  : %s\n"
+        "  Model    : %s\n"
+        "  ZIP      : %s",
+        out["figures"], out["tables"], out["metrics"],
+        out["models_final"], zip_path,
     )
 
 

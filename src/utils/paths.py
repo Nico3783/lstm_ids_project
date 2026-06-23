@@ -485,6 +485,71 @@ def assert_file_exists(path: Path, description: str = "") -> None:
         )
 
 
+def get_dataset_output_dirs(dataset: str) -> dict:
+    """
+    Return a dictionary of dataset-specific output directories.
+
+    Every dataset gets its own subtree so that running multiple
+    datasets in sequence never overwrites another's results.
+
+    Structure::
+
+        outputs/<dataset>/                          (root)
+        outputs/<dataset>/models/checkpoints/
+        outputs/<dataset>/models/final/
+        outputs/<dataset>/models/baselines/
+        outputs/<dataset>/reports/figures/
+        outputs/<dataset>/reports/tables/
+        outputs/<dataset>/reports/metrics/
+        outputs/<dataset>/reports/logs/
+        outputs/<dataset>/predictions/
+        outputs/<dataset>/exported/
+
+    Parameters
+    ----------
+    dataset : str
+        Dataset identifier — one of ``nsl_kdd``, ``cicids2017``,
+        ``unsw_nb15``.
+
+    Returns
+    -------
+    dict
+        Keys: ``root``, ``models``, ``models_checkpoints``,
+        ``models_final``, ``models_baselines``, ``figures``,
+        ``tables``, ``metrics``, ``logs``, ``tensorboard``,
+        ``predictions``, ``exported``.
+        Values: absolute ``Path`` objects (directories are created).
+    """
+    valid = {"nsl_kdd", "cicids2017", "unsw_nb15"}
+    if dataset not in valid:
+        raise ValueError(
+            f"Unknown dataset '{dataset}'. "
+            f"Choose from: {sorted(valid)}"
+        )
+
+    root = OUTPUTS_DIR / dataset
+
+    dirs = {
+        "root":                root,
+        "models":              root / "models",
+        "models_checkpoints":  root / "models" / "checkpoints",
+        "models_final":        root / "models" / "final",
+        "models_baselines":    root / "models" / "baselines",
+        "figures":             root / "reports" / "figures",
+        "tables":              root / "reports" / "tables",
+        "metrics":             root / "reports" / "metrics",
+        "logs":                root / "reports" / "logs",
+        "tensorboard":         root / "reports" / "logs" / "tensorboard",
+        "predictions":         root / "predictions",
+        "exported":            root / "exported",
+    }
+
+    for d in dirs.values():
+        d.mkdir(parents=True, exist_ok=True)
+
+    return dirs
+
+
 def get_all_paths_summary() -> dict:
     """
     Return a dictionary mapping descriptive labels to their

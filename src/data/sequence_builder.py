@@ -165,6 +165,10 @@ def build_sequences_chunked(
     or UNSW-NB15 datasets that contain millions of records
     and the full pre-allocated approach exceeds available RAM.
 
+    Chunks are written to temporary .npy files on disk and
+    loaded back one at a time, keeping peak RAM to
+    ``final_array + 1_chunk`` instead of ``2 × final_array``.
+
     Parameters
     ----------
     X : np.ndarray
@@ -182,6 +186,10 @@ def build_sequences_chunked(
     -------
     tuple of (X_seq, y_seq)
     """
+    import gc
+    import tempfile
+    import shutil
+
     _validate_inputs(X, y, window_size)
 
     n_samples, n_features = X.shape
@@ -193,8 +201,9 @@ def build_sequences_chunked(
         n_sequences, chunk_size,
     )
 
-    X_chunks: List[np.ndarray] = []
-    y_chunks: List[np.ndarray] = []
+    # --- Phase 1: write chunks to temp files on disk ---
+    tmp_dir = Path(tempfile.mkdtemp(prefix="seq_chunks_"))
+    chunk_meta: List[Tuple[Path, int]] = []  # (path, count)
 
     starts = range(0, n_samples - window_size + 1, step_size)
     total_chunks = math.ceil(len(starts) / chunk_size)  # type: ignore
@@ -204,12 +213,13 @@ def build_sequences_chunked(
             range(0, len(starts), chunk_size)  # type: ignore
         ):
             chunk_ends = list(starts)[chunk_start: chunk_start + chunk_size]
+            n_chunk = len(chunk_ends)
 
             X_chunk = np.empty(
-                (len(chunk_ends), window_size, n_features),
+                (n_chunk, window_size, n_features),
                 dtype=np.float32,
             )
-            y_chunk = np.empty(len(chunk_ends), dtype=np.int64)
+            y_chunk = np.empty(n_chunk, dtype=np.int64)
 
             for seq_idx, start in enumerate(chunk_ends):
                 end = start + window_size
@@ -218,16 +228,36 @@ def build_sequences_chunked(
                     y, start, end, label_position
                 )
 
-            X_chunks.append(X_chunk)
-            y_chunks.append(y_chunk)
+            # Write to disk and free immediately
+            x_path = tmp_dir / f"X_chunk_{chunk_idx:04d}.npy"
+            y_path = tmp_dir / f"y_chunk_{chunk_idx:04d}.npy"
+            np.save(x_path, X_chunk)
+            np.save(y_path, y_chunk)
+            chunk_meta.append((x_path, y_path, n_chunk))
+            del X_chunk, y_chunk
+            gc.collect()
 
             logger.debug(
-                "  Chunk %d/%d — %d sequences built.",
-                chunk_idx + 1, total_chunks, len(chunk_ends),
+                "  Chunk %d/%d — %d sequences written to disk.",
+                chunk_idx + 1, total_chunks, n_chunk,
             )
 
-    X_seq = np.concatenate(X_chunks, axis=0)
-    y_seq = np.concatenate(y_chunks, axis=0)
+        # --- Phase 2: load back into final array ---
+        X_seq = np.empty(
+            (n_sequences, window_size, n_features),
+            dtype=np.float32,
+        )
+        y_seq = np.empty(n_sequences, dtype=np.int64)
+
+        offset = 0
+        for x_path, y_path, n_chunk in chunk_meta:
+            X_seq[offset:offset + n_chunk] = np.load(x_path)
+            y_seq[offset:offset + n_chunk] = np.load(y_path)
+            offset += n_chunk
+
+    # Clean up temp files
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+    gc.collect()
 
     logger.info(
         "Chunked sequence construction complete — "
@@ -517,7 +547,7 @@ def rebuild_sequences_from_flat(
         n_samples, n_seqs, est_mb,
     )
 
-    if use_chunked or n_samples > 500_000:
+    if use_chunked or n_samples > 200_000:
         return build_sequences_chunked(
             X_flat, y_flat,
             window_size=window_size,

@@ -1,264 +1,250 @@
-# Kaggle Notebook — Copy each cell below into a new Kaggle notebook
+# Kaggle Notebook Cells
 
-## Setup
-1. Go to kaggle.com → Code → New Notebook
-2. Settings → Accelerator → GPU P100
-3. Copy each `### Cell X` below into a separate Kaggle cell
-4. Run all cells top to bottom
+Copy these into separate Kaggle notebook cells. Each `---` separator = one cell.
+Run cells in order. Each dataset gets its own cell so you can run one at a time.
 
 ---
 
-### Cell 1 — Check GPU
+## Cell 1 — Install & Download
+
+```python
+!pip install -q gdown scikit-learn pandas pyyaml joblib
+
+import gdown, os, zipfile, subprocess
+
+PROJECT_ZIP_ID = "1NJ3gkaHHQDYwR6QkKzaXMYp6lOcmhGtu"
+RAW_DATA_ID = "1C6Hc4yYKe-rwQo8yZD5S2wCSu2rBAjHD"
+
+os.chdir("/kaggle/working")
+
+# Download project code
+if not os.path.exists("src"):
+    gdown.download(id=PROJECT_ZIP_ID, output="lstm_project.zip", quiet=False)
+    with zipfile.ZipFile("lstm_project.zip", "r") as z:
+        z.extractall(".")
+    print("Project extracted.")
+
+# Download raw datasets
+if not os.path.exists("data/raw"):
+    gdown.download(id=RAW_DATA_ID, output="lstm_raw.zip", quiet=False)
+    with zipfile.ZipFile("lstm_raw.zip", "r") as z:
+        z.extractall(".")
+    print("Raw data extracted.")
+```
+
+---
+
+## Cell 2 — GPU Check & Memory Monitor
 
 ```python
 import subprocess, os
 
+# Check GPU
 result = subprocess.run(["nvidia-smi"], capture_output=True, text=True)
 if result.returncode == 0:
     print(result.stdout)
 else:
-    print("WARNING: No GPU detected. Go to Settings → Accelerator → GPU P100")
-    print("Without GPU, training will be very slow.")
+    print("WARNING: No GPU detected! Go to Kernel → Change runtime → GPU.")
+    print(result.stderr)
+
+# Memory monitor helper
+def mem_usage():
+    """Print current GPU and system memory usage."""
+    try:
+        import tensorflow as tf
+        gpus = tf.config.list_physical_devices("GPU")
+        if gpus:
+            from tensorflow.python.client import device_lib
+            devices = device_lib.list_local_devices()
+            for d in devices:
+                if d.device_type == "GPU":
+                    print(f"[GPU] {d.name}: {d.memory_limit / 1e9:.1f} GB allocated")
+    except Exception:
+        pass
+    # System RAM
+    with open("/proc/meminfo") as f:
+        for line in f:
+            if line.startswith("MemAvailable"):
+                avail = int(line.split()[1]) / 1e6
+                print(f"[RAM] Available: {avail:.1f} GB")
+                break
+
+mem_usage()
 ```
 
 ---
 
-### Cell 2 — Download from Google Drive
+## Cell 3 — Run NSL-KDD
 
 ```python
-import shutil, os
+import sys, os, traceback, json, datetime
+os.chdir("/kaggle/working")
+sys.path.insert(0, ".")
 
-WORKING = "/kaggle/working"
-INPUT = "/kaggle/input"
+LOG_FILE = "log_nsl_kdd.txt"
+results = {}
 
-# Your Google Drive sharing links
-PROJECT_DRIVE_ID = "1NJ3gkaHHQDYwR6QkKzaXMYp6lOcmhGtu"  # lstm_project.zip
-DATA_DRIVE_ID    = "1C6Hc4yYKe-rwQo8yZD5S2wCSu2rBAjHD"  # lstm_raw.zip
+try:
+    # Run pipeline — logs go to file AND stdout
+    with open(LOG_FILE, "w") as log_f:
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = log_f
+        sys.stderr = log_f
+        try:
+            from run_pipeline import parse_args, main
+            sys.argv = ["run_pipeline.py", "--dataset", "nsl_kdd"]
+            main()
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
 
-project_zip = None
-data_zip = None
+    # Print last 80 lines of log (not tail -60 which hides errors)
+    print("=" * 60)
+    print("NSL-KDD LOG (last 80 lines):")
+    print("=" * 60)
+    with open(LOG_FILE) as f:
+        lines = f.readlines()
+        for line in lines[-80:]:
+            print(line, end="")
 
-# --- Method 1: Download from Google Drive ---
-if PROJECT_DRIVE_ID or DATA_DRIVE_ID:
-    !pip install -q gdown
-    import gdown
+    results["nsl_kdd"] = "SUCCESS"
 
-    if PROJECT_DRIVE_ID and not os.path.exists(f"{WORKING}/lstm_project.zip"):
-        print(f"Downloading project zip from Google Drive ({PROJECT_DRIVE_ID})...")
-        gdown.download(id=PROJECT_DRIVE_ID, output=f"{WORKING}/lstm_project.zip", quiet=False)
-    project_zip = f"{WORKING}/lstm_project.zip"
+except Exception as e:
+    print(f"NSL-KDD FAILED: {e}")
+    traceback.print_exc()
+    # Print full log for debugging
+    if os.path.exists(LOG_FILE):
+        print("\n--- FULL LOG ---")
+        with open(LOG_FILE) as f:
+            print(f.read())
+    results["nsl_kdd"] = f"FAILED: {e}"
 
-    if DATA_DRIVE_ID and not os.path.exists(f"{WORKING}/lstm_raw.zip"):
-        print(f"Downloading data zip from Google Drive ({DATA_DRIVE_ID})...")
-        gdown.download(id=DATA_DRIVE_ID, output=f"{WORKING}/lstm_raw.zip", quiet=False)
-    data_zip = f"{WORKING}/lstm_raw.zip"
-
-# --- Method 2: Find in Kaggle input (added via "Add Data") ---
-if not project_zip or not data_zip:
-    for root, dirs, files in os.walk(INPUT):
-        for f in files:
-            path = os.path.join(root, f)
-            if f == "lstm_project.zip" and not project_zip:
-                project_zip = path
-            elif f == "lstm_raw.zip" and not data_zip:
-                data_zip = path
-
-print(f"Project zip: {project_zip}")
-print(f"Data zip:    {data_zip}")
-
-# Extract project code
-if project_zip:
-    print("\nExtracting project code...")
-    !unzip -q -o "{project_zip}" -d "{WORKING}"
-    print("Done.")
-else:
-    print("ERROR: lstm_project.zip not found.")
-    print("Paste your Google Drive ID above, or add the dataset to this notebook.")
-
-# Extract raw data
-if data_zip:
-    raw_dir = f"{WORKING}/data/raw"
-    if not os.path.exists(f"{raw_dir}/nsl_kdd"):
-        print("\nExtracting raw data...")
-        os.makedirs(raw_dir, exist_ok=True)
-        !unzip -q -o "{data_zip}" -d "{raw_dir}"
-        print("Done.")
-    else:
-        print("\nRaw data already extracted.")
-else:
-    print("ERROR: lstm_raw.zip not found.")
-    print("Paste your Google Drive ID above, or add the dataset to this notebook.")
-
-print("\nDataset directories:")
-!ls {WORKING}/data/raw/
+print("\n" + "=" * 60)
+print("NSL-KDD RESULT:", results.get("nsl_kdd", "unknown"))
+print("=" * 60)
 ```
 
 ---
 
-### Cell 3 — Rename tensorflow shim + set backend
+## Cell 4 — Run UNSW-NB15 (subsampled)
 
 ```python
+import sys, os, traceback
+os.chdir("/kaggle/working")
+sys.path.insert(0, ".")
+
+LOG_FILE = "log_unsw_nb15.txt"
+
+try:
+    with open(LOG_FILE, "w") as log_f:
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = log_f
+        sys.stderr = log_f
+        try:
+            from run_pipeline import parse_args, main
+            sys.argv = ["run_pipeline.py", "--dataset", "unsw_nb15", "--subsample", "0.3"]
+            main()
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+
+    print("=" * 60)
+    print("UNSW-NB15 LOG (last 80 lines):")
+    print("=" * 60)
+    with open(LOG_FILE) as f:
+        lines = f.readlines()
+        for line in lines[-80:]:
+            print(line, end="")
+
+except Exception as e:
+    print(f"UNSW-NB15 FAILED: {e}")
+    traceback.print_exc()
+    if os.path.exists(LOG_FILE):
+        print("\n--- FULL LOG ---")
+        with open(LOG_FILE) as f:
+            print(f.read())
+```
+
+---
+
+## Cell 5 — Run CICIDS2017
+
+```python
+import sys, os, traceback
+os.chdir("/kaggle/working")
+sys.path.insert(0, ".")
+
+LOG_FILE = "log_cicids2017.txt"
+
+try:
+    with open(LOG_FILE, "w") as log_f:
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = log_f
+        sys.stderr = log_f
+        try:
+            from run_pipeline import parse_args, main
+            sys.argv = ["run_pipeline.py", "--dataset", "cicids2017"]
+            main()
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+
+    print("=" * 60)
+    print("CICIDS2017 LOG (last 80 lines):")
+    print("=" * 60)
+    with open(LOG_FILE) as f:
+        lines = f.readlines()
+        for line in lines[-80:]:
+            print(line, end="")
+
+except Exception as e:
+    print(f"CICIDS2017 FAILED: {e}")
+    traceback.print_exc()
+    if os.path.exists(LOG_FILE):
+        print("\n--- FULL LOG ---")
+        with open(LOG_FILE) as f:
+            print(f.read())
+```
+
+---
+
+## Cell 6 — Save Results to Google Drive
+
+```python
+import os, zipfile, subprocess
+from google.colab import drive  # Kaggle doesn't have this; skip if on Kaggle
+
+# On Kaggle, download results manually or use this cell to zip them
 os.chdir("/kaggle/working")
 
-# Rename the local tensorflow shim so real TF (GPU) is used
-if os.path.exists("tensorflow"):
-    !mv tensorflow tensorflow_shim_local
-    print("Renamed tensorflow/ shim to tensorflow_shim_local/")
+# Create a results archive
+result_files = []
+for root, dirs, files in os.walk("."):
+    for f in files:
+        if any(f.endswith(ext) for ext in [".csv", ".json", ".npy", ".pkl", ".png", ".txt", ".h5"]):
+            result_files.append(os.path.join(root, f))
+
+if result_files:
+    with zipfile.ZipFile("kaggle_results.zip", "w", zipfile.ZIP_DEFLATED) as zf:
+        for fp in result_files:
+            zf.write(fp)
+    print(f"Results archived: kaggle_results.zip ({len(result_files)} files)")
+    print("Download from: /kaggle/working/kaggle_results.zip")
 else:
-    print("No tensorflow/ shim found (already renamed or not present).")
-
-os.environ["KERAS_BACKEND"] = "tensorflow"
-
-import tensorflow as tf
-print(f"TensorFlow version: {tf.__version__}")
-print(f"GPU: {tf.config.list_physical_devices('GPU')}")
+    print("No result files found.")
 ```
 
 ---
 
-### Cell 4 — Install dependencies
+## Notes
 
-```python
-!pip install -q -r requirements_colab.txt
-!pip install -q click
-print("Dependencies installed.")
-```
-
----
-
-### Cell 5 — Verify environment
-
-```python
-import sys, numpy as np, keras
-
-print(f"Python:     {sys.version}")
-print(f"NumPy:      {np.__version__}")
-print(f"Keras:      {keras.__version__}")
-print(f"Backend:    {keras.backend.backend()}")
-
-gpus = tf.config.list_physical_devices("GPU")
-print(f"GPU:        {gpus[0].name if gpus else 'NONE'}")
-
-print(f"\nProject files:")
-!ls run_pipeline.py requirements_colab.txt 2>&1
-```
-
----
-
-### Cell 6 — Run Pipeline: NSL-KDD
-
-```python
-import shutil
-
-# Clean previous run artifacts
-for d in ["reports", "models"]:
-    if os.path.exists(d):
-        shutil.rmtree(d)
-        print(f"Cleaned {d}/")
-# Remove stale flat processed files (old bug artifact)
-if os.path.exists("data/processed"):
-    for item in os.listdir("data/processed"):
-        p = f"data/processed/{item}"
-        if os.path.isfile(p):
-            os.remove(p)
-            print(f"Removed stale file: {p}")
-
-os.environ["KERAS_BACKEND"] = "tensorflow"
-
-!python run_pipeline.py --dataset nsl_kdd --skip-eda 2>&1 | tail -60
-```
-
----
-
-### Cell 7 — Run Pipeline: UNSW-NB15
-
-```python
-# Clean previous run artifacts
-for d in ["reports", "models"]:
-    if os.path.exists(d):
-        shutil.rmtree(d)
-        print(f"Cleaned {d}/")
-
-os.environ["KERAS_BACKEND"] = "tensorflow"
-
-!python run_pipeline.py --dataset unsw_nb15 --skip-eda 2>&1 | tail -60
-```
-
----
-
-### Cell 8 — Run Pipeline: CICIDS2017 (largest, ~3-5 hrs on P100)
-
-```python
-# Clean previous run artifacts
-for d in ["reports", "models"]:
-    if os.path.exists(d):
-        shutil.rmtree(d)
-        print(f"Cleaned {d}/")
-
-os.environ["KERAS_BACKEND"] = "tensorflow"
-
-!python run_pipeline.py --dataset cicids2017 --skip-eda 2>&1 | tail -60
-```
-
----
-
-### Cell 9 — Package all results for download
-
-```python
-# Copy final results to a single output folder
-import shutil, json
-from pathlib import Path
-
-OUT = "/kaggle/working/final_results"
-os.makedirs(OUT, exist_ok=True)
-
-for ds in ["nsl_kdd", "unsw_nb15", "cicids2017"]:
-    for src in ["reports", "models"]:
-        if os.path.exists(src):
-            dst = f"{OUT}/{ds}/{src}"
-            shutil.copytree(src, dst, dirs_exist_ok=True)
-
-# Create download zip
-!cd /kaggle/working && zip -r final_results.zip final_results/
-print("\nDownload 'final_results.zip' from the Kaggle output panel.")
-print("(Right sidebar → Output → final_results.zip → Download)")
-```
-
----
-
-### Cell 10 — Summary of all runs
-
-```python
-print("=" * 60)
-print("RESULTS SUMMARY — All Datasets")
-print("=" * 60)
-
-for ds in ["nsl_kdd", "unsw_nb15", "cicids2017"]:
-    for subdir in ["reports/metrics", "reports", "metrics"]:
-        result_file = Path(f"{OUT}/{ds}/{subdir}/evaluation_results.json")
-        if result_file.exists():
-            break
-    else:
-        # Also check working dir
-        for subdir in ["reports/metrics", "reports"]:
-            result_file = Path(f"/kaggle/working/{subdir}/evaluation_results.json")
-            if result_file.exists():
-                break
-        else:
-            result_file = None
-
-    print(f"\n--- {ds.upper()} ---")
-    if result_file and result_file.exists():
-        with open(result_file) as f:
-            data = json.load(f)
-        for model_name, metrics in data.items():
-            acc = metrics.get("accuracy", "N/A")
-            f1 = metrics.get("f1_macro", "N/A")
-            roc = metrics.get("roc_auc_macro", "N/A")
-            if isinstance(acc, float):
-                print(f"  {model_name:25s}  Acc={acc:.4f}  F1={f1:.4f}  ROC={roc:.4f}")
-            else:
-                print(f"  {model_name:25s}  Acc={acc}  F1={f1}  ROC={roc}")
-    else:
-        print("  No results found.")
-```
+- **UNSW-NB15 uses `--subsample 0.3`** — trains on 30% of the data to avoid OOM.
+  Increase to `0.5` if Kaggle has headroom.
+- **CICIDS2017 runs full** — borderline on RAM but should fit with the new
+  disk-backed chunked builder.
+- Each dataset cell saves its own log file for debugging.
+- All logs show the last 80 lines plus the full log on failure.
+- GPU memory growth is now enabled in `run_pipeline.py` automatically.

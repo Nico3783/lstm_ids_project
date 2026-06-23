@@ -25,6 +25,7 @@
 #           13.  Export Chapter 4 ZIP archive
 
 import argparse
+import gc
 import sys
 from pathlib import Path
 
@@ -71,6 +72,13 @@ def parse_args() -> argparse.Namespace:
         help="Use NSL-KDD 20%% training subset (faster).",
     )
     parser.add_argument(
+        "--subsample",
+        type=float,
+        default=None,
+        help="Use only this fraction of the dataset (e.g. 0.5 for 50%%). "
+             "Useful for large datasets on memory-constrained machines.",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Set log level to DEBUG.",
@@ -88,6 +96,19 @@ def main() -> None:
     )
     from src.utils.paths import create_project_directories
     from src.config import get_config, override_dataset
+
+    # GPU memory growth — prevent TF from grabbing all VRAM at once
+    import os
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+    try:
+        import tensorflow as tf
+        gpus = tf.config.list_physical_devices("GPU")
+        if gpus:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            print(f"[GPU] Memory growth enabled for {len(gpus)} GPU(s).")
+    except Exception:
+        pass  # TF not available or CPU-only
 
     if args.verbose:
         set_global_log_level("DEBUG")
@@ -183,6 +204,23 @@ def main() -> None:
             validate=True,
             use_20pct_train=args.use_20pct,
         )
+
+        # Subsample for memory-constrained environments
+        if args.subsample and 0.0 < args.subsample < 1.0:
+            from sklearn.model_selection import train_test_split
+            n_before = len(main_df)
+            main_df, _ = train_test_split(
+                main_df,
+                train_size=args.subsample,
+                stratify=main_df[main_df.columns[-1]],
+                random_state=42,
+            )
+            main_df = main_df.reset_index(drop=True)
+            logger.info(
+                "Subsampled to %.0f%% — %d → %d rows.",
+                args.subsample * 100, n_before, len(main_df),
+            )
+
         summary = get_dataset_summary(main_df, args.dataset)
         save_json(summary, TABLES_DIR / "dataset_summary.json")
         logger.info("Dataset loaded: %d rows.", len(main_df))
@@ -214,6 +252,9 @@ def main() -> None:
             "Preprocessing complete — X: %s, classes: %d.",
             X_scaled.shape, n_classes,
         )
+        # Free raw DataFrame from memory
+        del main_df
+        gc.collect()
 
         # STAGE 5 — Sequence building
         log_section_header(logger, "STAGE 5 — SEQUENCE BUILDING")
@@ -262,6 +303,10 @@ def main() -> None:
             metadata=metadata,
             output_dir=FINAL_MODEL_DIR,
         )
+
+        # Free sequence arrays from memory (splits are now in .npy files)
+        del X_seq, y_seq, X_scaled, y
+        gc.collect()
 
         # STAGE 7 — Hyperparameter tuning (optional)
         if args.tune or cfg.hyperparameter_tuning.enabled:

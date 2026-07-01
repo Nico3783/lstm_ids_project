@@ -421,15 +421,15 @@ def train_baselines(
 def run_full_training(
     X_train: np.ndarray,
     X_val: np.ndarray,
-    X_test: np.ndarray,
     y_train: np.ndarray,
     y_val: np.ndarray,
-    y_test: np.ndarray,
     n_classes: int,
     dataset: str = "nsl_kdd",
     config: Optional[Any] = None,
     resume: bool = False,
     output_dir: Optional[Path] = None,
+    X_test: Optional[np.ndarray] = None,
+    y_test: Optional[np.ndarray] = None,
 ) -> Dict[str, TrainingResult]:
     """
     Run complete training for both the LSTM and all baseline
@@ -440,8 +440,12 @@ def run_full_training(
 
     Parameters
     ----------
-    X_train, X_val, X_test : np.ndarray
-    y_train, y_val, y_test : np.ndarray
+    X_train, X_val : np.ndarray
+        Training and validation feature arrays.
+    y_train, y_val : np.ndarray
+        Training and validation label arrays.
+    X_test, y_test : np.ndarray, optional
+        Test arrays — not used by training, kept for API compat.
     n_classes : int
     dataset : str
     config : AppConfig, optional

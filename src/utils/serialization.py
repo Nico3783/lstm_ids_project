@@ -372,6 +372,92 @@ def load_processed_arrays(
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
+def load_split_data(
+    input_dir: Union[str, Path],
+) -> Tuple[
+    np.ndarray, np.ndarray, np.ndarray,
+    np.ndarray, np.ndarray, np.ndarray,
+    Any, Any,
+]:
+    """
+    Load all six split arrays plus scaler and label encoder.
+
+    Alias kept for backward compatibility with run_pipeline.py.
+
+    Returns
+    -------
+    tuple
+        ``(X_train, X_val, X_test, y_train, y_val, y_test,
+           scaler, label_encoder)``
+    """
+    X_train, X_val, X_test, y_train, y_val, y_test = (
+        load_processed_arrays(input_dir)
+    )
+    scaler = load_object(Path(input_dir) / "scaler.pkl")
+    label_enc = load_object(Path(input_dir) / "label_encoder.pkl")
+    return X_train, X_val, X_test, y_train, y_val, y_test, scaler, label_enc
+
+
+def load_split_data_train(
+    input_dir: Union[str, Path],
+) -> Tuple[
+    np.ndarray, np.ndarray,
+    np.ndarray, np.ndarray,
+    Any, Any,
+]:
+    """
+    Load only train + val arrays (skip test) to reduce peak RAM.
+
+    Use this during training/tuning/baselines.  Test data is
+    loaded separately by ``load_split_data_test()`` when needed.
+
+    Returns
+    -------
+    tuple
+        ``(X_train, X_val, y_train, y_val, scaler, label_encoder)``
+    """
+    from src.utils.constants import (
+        X_TRAIN_NPY, X_VAL_NPY,
+        Y_TRAIN_NPY, Y_VAL_NPY,
+    )
+
+    input_dir = Path(input_dir)
+
+    X_train = load_numpy_array(input_dir / X_TRAIN_NPY)
+    X_val   = load_numpy_array(input_dir / X_VAL_NPY)
+    y_train = load_numpy_array(input_dir / Y_TRAIN_NPY)
+    y_val   = load_numpy_array(input_dir / Y_VAL_NPY)
+    scaler  = load_object(input_dir / "scaler.pkl")
+    label_enc = load_object(input_dir / "label_encoder.pkl")
+
+    logger.info(
+        "Train split loaded — X_train %s | X_val %s (test deferred)",
+        X_train.shape, X_val.shape,
+    )
+    return X_train, X_val, y_train, y_val, scaler, label_enc
+
+
+def load_split_data_test(
+    input_dir: Union[str, Path],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Load only test arrays — called on-demand during evaluation.
+
+    Returns
+    -------
+    tuple
+        ``(X_test, y_test)``
+    """
+    from src.utils.constants import X_TEST_NPY, Y_TEST_NPY
+
+    input_dir = Path(input_dir)
+    X_test  = load_numpy_array(input_dir / X_TEST_NPY)
+    y_test  = load_numpy_array(input_dir / Y_TEST_NPY)
+
+    logger.info("Test split loaded — X_test %s", X_test.shape)
+    return X_test, y_test
+
+
 # JSON Metadata Serialization
 
 def save_metadata(

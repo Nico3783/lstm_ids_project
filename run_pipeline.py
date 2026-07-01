@@ -85,9 +85,11 @@ from src.utils.helpers import set_seed
 from src.utils.logger import get_logger
 from src.utils.paths import get_dataset_output_dirs
 from src.utils.serialization import (
-    save_split_data,
-    load_split_data,
+    save_processed_arrays,
     load_processed_arrays,
+    load_split_data,
+    load_split_data_train,
+    load_split_data_test,
 )
 from src.visualization.dashboard import (
     plot_training_history,
@@ -454,6 +456,8 @@ def main() -> None:
             "n_samples": int(X_seq.shape[0]),
             "n_classes": n_classes,
         })
+        # Free raw DataFrame from memory — no longer needed
+        del df_raw, df
         pm.end_stage("preprocessing")
         gc.collect()
         logger.info("Preprocessing done.")
@@ -517,22 +521,30 @@ def main() -> None:
             "val_shape": list(X_val.shape),
             "test_shape": list(X_test.shape),
         })
+        # Free all split arrays — they're saved to disk; loaded lazily later
+        del X_train, X_val, X_test, y_train, y_val, y_test, scaler, label_enc
+        del X_seq, y_labels
+        if preprocessed_arrays is not None:
+            preprocessed_arrays.clear()
+            preprocessed_arrays = None
         pm.end_stage("split_save")
         gc.collect()
         logger.info("Data split done.")
 
     # =================================================================
-    # Load split data (needed by all subsequent stages)
+    # Load split data lazily — only what's needed per stage
     # =================================================================
+    # Training stages only need X_train, y_train, X_val, y_val, scaler, label_enc
+    # Test data (X_test, y_test) is loaded on-demand for evaluation.
     logger.info("Loading split arrays from: %s", preprocessed_dir)
-    X_train, X_val, X_test, y_train, y_val, y_test, scaler, label_enc = (
-        load_split_data(preprocessed_dir)
+    X_train, X_val, y_train, y_val, scaler, label_enc = (
+        load_split_data_train(preprocessed_dir)
     )
 
     n_classes = _load_n_classes(preprocessed_dir, args.dataset)
     logger.info(
-        "Loaded — train: %s, val: %s, test: %s, n_classes: %d",
-        X_train.shape, X_val.shape, X_test.shape, n_classes,
+        "Loaded — train: %s, val: %s, n_classes: %d",
+        X_train.shape, X_val.shape, n_classes,
     )
 
     # =================================================================
@@ -602,6 +614,9 @@ def main() -> None:
             # Evaluate each baseline
             from src.utils.serialization import load_baseline_model
 
+            # Load test data on-demand for baseline evaluation
+            X_test, y_test = load_split_data_test(preprocessed_dir)
+
             results: Dict[str, Any] = {}
             for name in ["random_forest", "svm", "logistic_regression"]:
                 try:
@@ -630,6 +645,8 @@ def main() -> None:
                 "training_samples": int(X_bl.shape[0]),
                 "models": list(results.keys()),
             })
+            # Free test data and baseline copies from memory
+            del X_test, y_test, X_bl, y_bl, fitted
             pm.end_stage("baselines")
             gc.collect()
             logger.info("Baselines done.")
@@ -678,9 +695,9 @@ def main() -> None:
         run_full_training(
             X_train, y_train,
             X_val, y_val,
-            X_test, y_test,
-            config,
-            n_classes,
+            n_classes=n_classes,
+            dataset=args.dataset,
+            config=config,
             output_dir=str(final_dir),
             resume=resume_ckpt_path is not None,
         )
@@ -699,6 +716,9 @@ def main() -> None:
     if "evaluation" in stages_to_run:
         pm.start_stage("evaluation")
         logger.info("━━━ Stage 7/9: Evaluation ━━━")
+
+        # Load test data on-demand for evaluation
+        X_test, y_test = load_split_data_test(preprocessed_dir)
 
         # Load trained LSTM
         from src.utils.serialization import load_trained_model
@@ -737,6 +757,8 @@ def main() -> None:
             "report_csv": str(report_csv),
             "cm_csv": str(cm_csv),
         })
+        # Free test data and model from memory
+        del X_test, y_test, lstm_model, y_pred
         pm.end_stage("evaluation")
         gc.collect()
         logger.info("Evaluation done.")
@@ -763,6 +785,11 @@ def main() -> None:
         # Load LSTM model for predictions
         from src.utils.serialization import load_trained_model
 
+        # Load test data on-demand for visualization
+        X_test_viz, y_test_viz = load_split_data_test(preprocessed_dir)
+        # Reload train data on-demand for class distribution / feature plots
+        X_train_viz, _, y_train_viz, _, _, _ = load_split_data_train(preprocessed_dir)
+
         keras_path = final_dir / "lstm_model.keras"
         h5_path = final_dir / "lstm_model.h5"
         if keras_path.exists():
@@ -773,27 +800,31 @@ def main() -> None:
             lstm_model = None
 
         if lstm_model is not None:
-            y_pred_proba = lstm_model.predict(X_test, verbose=0)
+            y_pred_proba = lstm_model.predict(X_test_viz, verbose=0)
 
             # ROC curves (one-vs-rest)
             plot_roc_curves(
-                y_test, y_pred_proba, n_classes,
+                y_test_viz, y_pred_proba, n_classes,
                 str(figures_dir),
             )
 
             # Per-class ROC
             plot_per_class_roc(
-                y_test, y_pred_proba, n_classes,
+                y_test_viz, y_pred_proba, n_classes,
                 str(figures_dir),
             )
 
+            del lstm_model, y_pred_proba
+
         # Class distribution
-        plot_class_distribution(y_train, str(figures_dir))
+        plot_class_distribution(y_train_viz, str(figures_dir))
 
         # Feature distributions (sample for speed)
         plot_feature_distributions(
-            X_train[:1000], str(figures_dir),
+            X_train_viz[:1000], str(figures_dir),
         )
+
+        del X_test_viz, y_test_viz, X_train_viz, y_train_viz
 
         rm.stage_complete("visualization")
         pm.end_stage("visualization")
@@ -835,6 +866,7 @@ def main() -> None:
 
         rm.stage_complete("export")
         pm.end_stage("export")
+        gc.collect()
         logger.info("Export done.")
 
     # ── Summary ─────────────────────────────────────────────────────

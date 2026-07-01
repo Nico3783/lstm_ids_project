@@ -392,10 +392,12 @@ def load_cicids2017(
             f"  {data_dir}"
         )
 
+    n_files = len(frames)
     merged = pd.concat(frames, axis=0, ignore_index=True)
+    del frames
     logger.info(
         "CICIDS2017 merged: %d rows × %d cols from %d files.",
-        len(merged), len(merged.columns), len(frames),
+        len(merged), len(merged.columns), n_files,
     )
 
     if validate:

@@ -243,7 +243,6 @@ def map_nsl_kdd_labels(df: pd.DataFrame) -> pd.DataFrame:
         )
 
     # Step 1: raw attack type → category string
-    df = df.copy()
     df["label_category"] = (
         df[NSL_KDD_TARGET_COLUMN]
         .str.lower()
@@ -262,7 +261,7 @@ def map_nsl_kdd_labels(df: pd.DataFrame) -> pd.DataFrame:
             "Dropping %d records with unrecognised attack types: %s",
             n_unknown, unknown_vals,
         )
-        df = df[df["label_category"].notna()].copy()
+        df = df.dropna(subset=["label_category"])
 
     # Step 2: category string → integer
     df[NSL_KDD_TARGET_COLUMN] = (
@@ -301,7 +300,6 @@ def map_cicids2017_labels(df: pd.DataFrame) -> pd.DataFrame:
             f"Target column '{target}' not found in DataFrame."
         )
 
-    df = df.copy()
     categories = sorted(df[target].unique().tolist())
 
     # Place BENIGN at index 0
@@ -339,7 +337,6 @@ def map_unsw_nb15_labels(df: pd.DataFrame) -> pd.DataFrame:
             f"Target column '{UNSW_NB15_TARGET_COLUMN}' not found."
         )
 
-    df = df.copy()
     df[UNSW_NB15_TARGET_COLUMN] = (
         df[UNSW_NB15_TARGET_COLUMN]
         .astype(str)

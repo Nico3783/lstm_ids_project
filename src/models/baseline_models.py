@@ -83,14 +83,20 @@ def build_svm(
     max_iter: int = 1000,
     class_weight: str = "balanced",
     random_state: int = 42,
+    n_samples: int = 0,
 ) -> Any:
     """
     Build a Support Vector Machine classifier.
 
+    For datasets with more than 50 000 training samples, uses
+    ``LinearSVC`` (much faster) instead of ``SVC(kernel="rbf")``.
+    The caller can override this by passing ``n_samples=0``.
+
     Parameters
     ----------
     kernel : str
-        SVM kernel.  Default: ``"rbf"``.
+        SVM kernel.  Default: ``"rbf"``.  Ignored when
+        ``n_samples > 50_000`` (LinearSVC is used instead).
     C : float
         Regularisation parameter.
     gamma : str or float
@@ -99,11 +105,31 @@ def build_svm(
         Maximum solver iterations.
     class_weight : str
     random_state : int
+    n_samples : int
+        Number of training samples.  When > 50 000, a linear
+        kernel is used automatically for scalability.
 
     Returns
     -------
-    sklearn.svm.SVC
+    sklearn.svm.SVC or sklearn.svm.LinearSVC
     """
+    # Auto-select linear kernel for large datasets (Req 6)
+    if n_samples > 50_000:
+        from sklearn.svm import LinearSVC  # type: ignore
+
+        model = LinearSVC(
+            C=C,
+            max_iter=max_iter,
+            class_weight=class_weight,
+            random_state=random_state,
+        )
+        logger.info(
+            "SVM (LinearSVC) built — C: %.2f, max_iter: %d "
+            "(n_samples=%d > 50K → linear kernel).",
+            C, max_iter, n_samples,
+        )
+        return model
+
     from sklearn.svm import SVC  # type: ignore
 
     model = SVC(
@@ -215,6 +241,10 @@ def train_all_baselines(
     """
     Build and train all three baseline models.
 
+    Automatically subsamples training data to ≤ 200 000 rows
+    when the dataset is large (Req 5).  For SVM, uses LinearSVC
+    when the training set exceeds 50 000 rows (Req 6).
+
     Parameters
     ----------
     X_train : np.ndarray
@@ -231,6 +261,21 @@ def train_all_baselines(
         ``{model_name: fitted_model}``
     """
     cfg = config or {}
+    n_samples = len(y_train)
+
+    # Auto-sample large training sets for baseline speed (Req 5)
+    MAX_BASELINE_SAMPLES = 200_000
+    X_work, y_work = X_train, y_train
+    if n_samples > MAX_BASELINE_SAMPLES:
+        rng = np.random.RandomState(42)
+        idx = rng.choice(n_samples, MAX_BASELINE_SAMPLES, replace=False)
+        X_work = X_train[idx]
+        y_work = y_train[idx]
+        logger.info(
+            "Auto-sampled baselines: %d → %d rows.",
+            n_samples, MAX_BASELINE_SAMPLES,
+        )
+        n_samples = MAX_BASELINE_SAMPLES
 
     rf_cfg  = cfg.get("random_forest",       {})
     svm_cfg = cfg.get("svm",                 {})
@@ -238,13 +283,13 @@ def train_all_baselines(
 
     models = {
         "random_forest":       build_random_forest(**rf_cfg),
-        "svm":                 build_svm(**svm_cfg),
+        "svm":                 build_svm(n_samples=n_samples, **svm_cfg),
         "logistic_regression": build_logistic_regression(**lr_cfg),
     }
 
     fitted: Dict[str, Any] = {}
     for name, model in models.items():
-        fitted[name] = train_baseline(model, X_train, y_train, name)
+        fitted[name] = train_baseline(model, X_work, y_work, name)
 
     return fitted
 

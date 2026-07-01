@@ -361,6 +361,7 @@ def train_baselines(
     )
 
     raw_cfg = config.raw.get("baselines", {})
+    n_samples = len(y_train)
 
     results: Dict[str, TrainingResult] = {}
 
@@ -374,6 +375,7 @@ def train_baselines(
             }
         ),
         "svm": build_svm(
+            n_samples=n_samples,
             **{
                 k: v for k, v in raw_cfg.get("svm", {}).items()
                 if k != "enabled"

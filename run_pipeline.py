@@ -1,533 +1,853 @@
 #!/usr/bin/env python3
-# run_pipeline.py
-# Project: Deep Learning IDS Using LSTM
-# Developer: Kayode Timileyin Nicholas
-# Purpose: Full end-to-end pipeline runner.
-#
-#          Running:
-#              python run_pipeline.py
-#          or
-#              python run_pipeline.py --dataset nsl_kdd
-#
-#          Automatically executes every stage:
-#            1.  Validate dataset availability
-#            2.  Load raw data
-#            3.  Exploratory Data Analysis (EDA)
-#            4.  Preprocess data
-#            5.  Build sequences
-#            6.  Split into train / val / test
-#            7.  Save processed arrays + artifacts
-#            8.  Train baseline models
-#            9.  Train LSTM model
-#           10.  Evaluate all models
-#           11.  Generate all Chapter 4 figures
-#           12.  Save reports and tables
-#           13.  Export Chapter 4 ZIP archive
+"""
+run_pipeline.py — Master orchestrator for the LSTM-IDS project.
+
+Runs the full pipeline end-to-end for a single dataset:
+    1. Load raw data
+    2. Preprocess (impute, encode, scale)
+    3. Build sliding-window sequences
+    4. Split into train / val / test and persist to disk
+    5. (Optional) Hyperparameter tuning with Keras Tuner
+    6. Train baseline models (RF, SVM, LR)
+    7. Train LSTM classifier
+    8. Evaluate on the test set
+    9. Generate tabular and textual reports
+
+Resume support:
+    --resume   Skip stages whose .done markers and artifacts exist.
+    --force S  Force re-run of specific stages (comma-separated or 'all').
+
+Auto-sampling (Req 5-6):
+    Baseline training automatically subsamples to 200K rows when the
+    training set exceeds 200K sequences.  SVM uses LinearSVC for
+    datasets with >50K samples.
+
+Progress reporting (Req 10):
+    Elapsed time, ETA, and RAM/GPU/disk usage are printed between stages.
+
+Checkpointing (Req 7-8):
+    LSTM training saves checkpoints every N epochs.  On resume the
+    training resumes from the last saved checkpoint, including the
+    optimizer state.
+
+Usage
+-----
+    # Fresh run (full pipeline)
+    python run_pipeline.py --dataset nsl_kdd
+
+    # Resume after interruption — skips completed stages
+    python run_pipeline.py --dataset nsl_kdd --resume
+
+    # Force re-run specific stages
+    python run_pipeline.py --dataset nsl_kdd --resume --force baselines,lstm_train
+
+    # Force re-run everything
+    python run_pipeline.py --dataset nsl_kdd --force all
+"""
+
+from __future__ import annotations
 
 import argparse
 import gc
+import logging
+import os
 import sys
+import time
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-# To ensure project root is on sys.path
-PROJECT_ROOT = Path(__file__).resolve().parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+# Ensure project root is on sys.path
+_PROJECT_ROOT = Path(__file__).resolve().parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
+from src.data.loaders import load_dataset
+from src.data.preprocessing import preprocess_dataset
+from src.data.sequence_builder import build_sequences, rebuild_sequences_from_flat
+from src.data.split import split_and_save
+from src.evaluation.classification_report import (
+    generate_classification_report,
+    save_confusion_matrix,
+    save_classification_txt,
+)
+from src.evaluation.metrics import evaluate_model, compute_per_class_metrics
+from src.models.baseline_models import (
+    train_all_baselines,
+    save_all_baselines,
+    load_all_baselines,
+    predict_baseline,
+)
+from src.models.lstm_model import build_lstm_model
+from src.models.model_factory import create_model
+from src.training.trainer import run_full_training
+from src.utils.config import load_config
+from src.utils.helpers import set_seed
+from src.utils.logger import get_logger
+from src.utils.paths import get_dataset_output_dirs
+from src.utils.serialization import (
+    save_split_data,
+    load_split_data,
+    load_processed_arrays,
+)
+from src.visualization.dashboard import (
+    plot_training_history,
+    plot_confusion_matrix,
+    plot_roc_curves,
+    plot_per_class_roc,
+    plot_feature_distributions,
+    plot_class_distribution,
+    export_chapter4_zip,
+)
+
+# Pipeline modules (new)
+from src.pipeline.resume import ResumeManager
+from src.pipeline.checkpoint import CheckpointManager
+from src.pipeline.config_hash import ConfigFingerprint
+from src.pipeline.progress import ProgressTracker
+
+logger = get_logger("run_pipeline")
+
+
+# ─── CLI ───────────────────────────────────────────────────────────────
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Deep Learning IDS Using LSTM — Full Pipeline",
+    p = argparse.ArgumentParser(
+        description="Run the full LSTM-IDS pipeline for one dataset.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    parser.add_argument(
+    p.add_argument(
         "--dataset",
+        type=str,
+        required=True,
         choices=["nsl_kdd", "cicids2017", "unsw_nb15"],
-        default="nsl_kdd",
-        help="Dataset to use (default: nsl_kdd).",
+        help="Dataset to process.",
     )
-    parser.add_argument(
+    p.add_argument(
+        "--config",
+        type=str,
+        default="config.yaml",
+        help="Path to the YAML configuration file.",
+    )
+    p.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Override the base output directory (default: outputs/).",
+    )
+
+    # Resume / force
+    p.add_argument(
         "--resume",
         action="store_true",
-        help="Resume LSTM training from the last saved checkpoint.",
+        help="Skip stages whose .done markers and artifacts already exist.",
     )
-    parser.add_argument(
+    p.add_argument(
+        "--force",
+        nargs="?",
+        const="all",
+        default=None,
+        metavar="STAGES",
+        help=(
+            "Force re-run of stages.  Accepts:\n"
+            "  'all'           — re-run every stage\n"
+            "  'stage1,stage2' — comma-separated stage names\n"
+            "Without a value, equivalent to --force all."
+        ),
+    )
+
+    # Stage skips
+    p.add_argument(
         "--skip-eda",
         action="store_true",
-        help="Skip exploratory data analysis (faster runs).",
+        help="Skip the exploratory data analysis step.",
     )
-    parser.add_argument(
+    p.add_argument(
         "--skip-baselines",
         action="store_true",
-        help="Skip baseline model training.",
+        help="Skip baseline model training (RF, SVM, LR).",
     )
-    parser.add_argument(
+    p.add_argument(
         "--tune",
         action="store_true",
         help="Run hyperparameter tuning before final training.",
     )
-    parser.add_argument(
-        "--use-20pct",
-        action="store_true",
-        help="Use NSL-KDD 20%% training subset (faster).",
-    )
-    parser.add_argument(
+
+    # Data sub-sampling
+    p.add_argument(
         "--subsample",
         type=float,
         default=None,
-        help="Use only this fraction of the dataset (e.g. 0.5 for 50%%). "
-             "Useful for large datasets on memory-constrained machines.",
+        help="Sub-sample the training data to this fraction (e.g. 0.3).",
     )
-    parser.add_argument(
-        "--verbose",
+
+    # Training overrides
+    p.add_argument("--epochs", type=int, default=None, help="Override max epochs.")
+    p.add_argument("--batch-size", type=int, default=None, help="Override batch size.")
+    p.add_argument("--learning-rate", type=float, default=None, help="Override learning rate.")
+    p.add_argument("--sequence-length", type=int, default=None, help="Override sliding window length.")
+
+    # Misc
+    p.add_argument("--seed", type=int, default=42, help="Random seed.")
+    p.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+    )
+    p.add_argument(
+        "--dry-run",
         action="store_true",
-        help="Set log level to DEBUG.",
+        help="Parse arguments and print plan, then exit.",
     )
-    return parser.parse_args()
+
+    return p.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
+def _parse_force_stages(raw: Optional[str], all_stages: List[str]) -> List[str]:
+    """Parse --force value into a list of stage names."""
+    if raw is None:
+        return []
+    if raw.strip().lower() == "all":
+        return list(all_stages)
+    return [s.strip() for s in raw.split(",") if s.strip()]
 
-    # ---- Setup ----
-    from src.utils.helpers import set_global_seed, print_banner, Timer
-    from src.utils.logger import (
-        get_pipeline_logger, set_global_log_level, log_section_header
-    )
-    from src.utils.paths import create_project_directories
-    from src.config import get_config, override_dataset
 
-    # GPU memory growth — prevent TF from grabbing all VRAM at once
-    import os
-    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+# ─── GPU setup ─────────────────────────────────────────────────────────
+
+def setup_gpu() -> None:
+    """Configure GPU memory growth to prevent TF from grabbing all VRAM."""
     try:
         import tensorflow as tf
+
         gpus = tf.config.list_physical_devices("GPU")
         if gpus:
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
-            print(f"[GPU] Memory growth enabled for {len(gpus)} GPU(s).")
-    except Exception:
-        pass  # TF not available or CPU-only
+            logger.info("GPU memory growth enabled for %d device(s).", len(gpus))
+        else:
+            logger.info("No GPU devices detected — running on CPU.")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("GPU setup failed: %s", exc)
 
-    if args.verbose:
-        set_global_log_level("DEBUG")
 
-    logger = get_pipeline_logger()
-    print_banner("Deep Learning IDS Using LSTM — Full Pipeline")
+# ─── Helpers ───────────────────────────────────────────────────────────
 
-    cfg = get_config()
-    override_dataset(args.dataset)
-    set_global_seed(cfg.seed)
-    create_project_directories()
+def _load_n_classes(preprocessed_dir: Path, dataset: str) -> int:
+    """Load the number of classes from preprocessed metadata.
 
-    logger.info("Dataset  : %s", args.dataset)
-    logger.info("Seed     : %d", cfg.seed)
-    logger.info("Window   : %d", cfg.sequence.window_size)
-    logger.info("Epochs   : %d", cfg.training.epochs)
-    logger.info("Batch    : %d", cfg.training.batch_size)
+    When resuming and skipping preprocessing, ``n_classes`` is not
+    derived from the raw data.  This helper loads it from the saved
+    label encoder or metadata.
+    """
+    import pickle
 
-    pipeline_timer = Timer("Full pipeline")
-    pipeline_timer.start()
+    le_path = preprocessed_dir / "label_encoder.pkl"
+    if le_path.exists():
+        with open(le_path, "rb") as f:
+            le = pickle.load(f)
+        return len(le.classes_)
 
-    # Compute dataset-specific output directories
-    from src.utils.paths import get_dataset_output_dirs
-    out = get_dataset_output_dirs(args.dataset)
-    for subdir in ["root", "models_baselines", "models_final",
-                   "models_checkpoints", "figures", "tables", "metrics",
-                   "logs", "tensorboard", "predictions", "exported"]:
-        logger.debug("  out[%-20s] = %s", subdir, out[subdir])
-    logger.info("Dataset output root: %s", out["root"])
+    meta_path = preprocessed_dir / "metadata.json"
+    if meta_path.exists():
+        import json
 
-    # Compute dataset-specific processed data directory
-    from src.utils.paths import get_processed_data_dir
-    from src.utils.constants import (
-        X_TRAIN_NPY, X_VAL_NPY, X_TEST_NPY,
-        Y_TRAIN_NPY, Y_VAL_NPY, Y_TEST_NPY,
-        SCALER_PKL, LABEL_ENCODER_PKL,
-        FEATURE_NAMES_PKL, METADATA_JSON,
+        with open(meta_path, "r") as f:
+            meta = json.load(f)
+        return meta.get("n_classes", 15)
+
+    # Fallback: count unique labels in y_labels.npy
+    y_path = preprocessed_dir / "y_labels.npy"
+    if y_path.exists():
+        import numpy as np
+
+        y = np.load(y_path)
+        return int(len(set(y.tolist())))
+
+    raise FileNotFoundError(
+        f"Cannot determine n_classes from {preprocessed_dir}. "
+        "Run preprocessing first or provide a valid preprocessed directory."
     )
-    import numpy as np
 
-    processed_dir = get_processed_data_dir(args.dataset)
-    logger.info("Processed data dir: %s", processed_dir)
 
-    # Check if we can resume from preprocessed data
-    can_resume = True
-    for fname in [X_TRAIN_NPY, X_VAL_NPY, X_TEST_NPY, Y_TRAIN_NPY, Y_VAL_NPY, Y_TEST_NPY, SCALER_PKL, LABEL_ENCODER_PKL, FEATURE_NAMES_PKL, METADATA_JSON]:
-        if not (processed_dir / fname).exists():
-            can_resume = False
-            break
+def _setup_output_dirs(output_base: str, dataset: str) -> Dict[str, Path]:
+    """Create and return the per-dataset output directory structure."""
+    dirs = get_dataset_output_dirs(dataset, output_base)
+    for key in ("preprocessed", "baselines", "final", "tables", "figures",
+                "metrics", "logs", "config", "exported", "predictions"):
+        d = dirs.get(key) or (dirs["root"] / key)
+        d.mkdir(parents=True, exist_ok=True)
+    return dirs
 
-    if args.resume and can_resume:
-        from src.utils.serialization import load_processed_arrays, load_preprocessing_artifacts
 
-        X_train, X_val, X_test, y_train, y_val, y_test = load_processed_arrays(processed_dir)
-        scaler, label_encoder, feature_names, metadata = load_preprocessing_artifacts(processed_dir)
+# ─── Main pipeline ─────────────────────────────────────────────────────
 
-        # Validate that the processed data belongs to the requested dataset
-        saved_dataset = metadata.get("dataset", "")
-        if saved_dataset != args.dataset:
-            logger.error(
-                "Dataset mismatch: processed data is for '%s' "
-                "but '%s' was requested. Delete the old data and "
-                "re-run without --resume.",
-                saved_dataset, args.dataset,
-            )
-            sys.exit(1)
+def main() -> None:
+    args = parse_args()
 
-        n_classes = metadata["n_classes"]
-        logger.info(
-            "Resuming pipeline: skipping EDA, preprocessing, "
-            "and sequence building stages."
+    # ── Logging ──────────────────────────────────────────────────────
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    logger.info("Pipeline started — dataset: %s", args.dataset)
+
+    # ── Output directories ──────────────────────────────────────────
+    output_base = args.output_dir or "outputs"
+    dirs = _setup_output_dirs(output_base, args.dataset)
+    preprocessed_dir = dirs["preprocessed"]
+    baselines_dir = dirs["baselines"]
+    final_dir = dirs["final"]
+    tables_dir = dirs["tables"]
+    figures_dir = dirs["figures"]
+    config_dir = dirs["config"]
+
+    # ── GPU ──────────────────────────────────────────────────────────
+    setup_gpu()
+
+    # ── Config ──────────────────────────────────────────────────────
+    config_path = Path(args.config)
+    if not config_path.exists():
+        logger.error("Config file not found: %s", config_path)
+        sys.exit(1)
+    config = load_config(str(config_path))
+    logger.info("Config loaded: %s", config_path)
+
+    # ── Seed ─────────────────────────────────────────────────────────
+    set_seed(args.seed)
+
+    # ── Pipeline modules ────────────────────────────────────────────
+    rm = ResumeManager(args.dataset, output_base)
+    fp = ConfigFingerprint(args.dataset, output_base)
+    pm = ProgressTracker(args.dataset)
+
+    # ── Resume / force plan ─────────────────────────────────────────
+    force_stages = _parse_force_stages(args.force, CheckpointManager.STAGES)
+    skip_stages: List[str] = []
+    if args.skip_baselines:
+        skip_stages.append("baselines")
+    if args.skip_eda:
+        # EDA is not a checkpointed stage; skip_eda only affects logging
+        pass
+
+    plan: Optional[Dict[str, Any]] = None
+    if args.resume or force_stages:
+        plan = rm.plan_resume(
+            str(config_path),
+            skip_stages=skip_stages,
+            force_stages=force_stages,
         )
-    else:
-        if args.resume:
+        logger.info(
+            "Resume plan — completed: %d, to_run: %d, config_changed: %s",
+            len(plan["completed"]),
+            len(plan["to_run"]),
+            plan["config_changed"],
+        )
+        if plan["config_changed"]:
             logger.warning(
-                "Resume flag passed, but processed arrays or "
-                "preprocessing artifacts are missing. "
-                "Running full preprocessing pipeline."
+                "Config fingerprint changed since last run. "
+                "All stages invalidated."
+            )
+        print("\n" + rm.resume_summary() + "\n")
+
+        # If nothing to run, we're done
+        if not plan["to_run"]:
+            logger.info("All stages completed — nothing to do.")
+            return
+
+    # ── Dry run ─────────────────────────────────────────────────────
+    if args.dry_run:
+        logger.info("Dry run — would execute:")
+        stages = plan["to_run"] if plan else CheckpointManager.STAGES
+        for s in stages:
+            logger.info("  - %s", s)
+        return
+
+    # ── Config fingerprint ──────────────────────────────────────────
+    fp.save_fingerprint(str(config_path), stage="pipeline_start")
+
+    # ── Training config overrides ──────────────────────────────────
+    if args.epochs is not None:
+        config["training"]["epochs"] = args.epochs
+    if args.batch_size is not None:
+        config["training"]["batch_size"] = args.batch_size
+    if args.learning_rate is not None:
+        config["training"]["learning_rate"] = args.learning_rate
+    if args.sequence_length is not None:
+        config["preprocessing"]["sequence_length"] = args.sequence_length
+
+    epochs = config["training"]["epochs"]
+
+    # Determine which stages to run
+    stages_to_run = plan["to_run"] if plan else list(CheckpointManager.STAGES)
+
+    # ── Determine if we need to load preprocessed data ──────────────
+    # When resuming, some stages may be skipped but later stages need
+    # the preprocessed arrays.  We load them lazily.
+    preprocessed_arrays: Optional[Dict[str, Any]] = None
+
+    def _ensure_preprocessed() -> Dict[str, Any]:
+        """Load preprocessed arrays if not already loaded."""
+        nonlocal preprocessed_arrays
+        if preprocessed_arrays is not None:
+            return preprocessed_arrays
+        logger.info("Loading preprocessed arrays from: %s", preprocessed_dir)
+        preprocessed_arrays = load_processed_arrays(preprocessed_dir)
+        return preprocessed_arrays
+
+    # =================================================================
+    # STAGE 1: Preprocessing
+    # =================================================================
+    if "preprocessing" in stages_to_run:
+        pm.start_stage("preprocessing")
+        logger.info("━━━ Stage 1/9: Preprocessing ━━━")
+
+        logger.info("Loading raw dataset: %s ...", args.dataset)
+        df_raw = load_dataset(args.dataset)
+        logger.info("Raw shape: %s", df_raw.shape)
+
+        df, feat_enc, label_enc, scaler, X_seq, y_labels = preprocess_dataset(
+            df_raw, config, dataset_name=args.dataset
+        )
+        logger.info(
+            "After preprocessing — sequences: %s, classes: %d",
+            X_seq.shape, len(label_enc.classes_),
+        )
+
+        # Persist preprocessed arrays
+        preprocessed_dir.mkdir(parents=True, exist_ok=True)
+        np_save = __import__("numpy").save
+        np_save(str(preprocessed_dir / "X_sequences.npy"), X_seq)
+        np_save(str(preprocessed_dir / "y_labels.npy"), y_labels)
+        import pickle as _pkl
+        with open(preprocessed_dir / "label_encoder.pkl", "wb") as f:
+            _pkl.dump(label_enc, f)
+        with open(preprocessed_dir / "scaler.pkl", "wb") as f:
+            _pkl.dump(scaler, f)
+        with open(preprocessed_dir / "feature_names.pkl", "wb") as f:
+            _pkl.dump(
+                list(df.columns.drop("label", errors="ignore")),
+                f,
             )
 
-        # STAGE 1 — Validate dataset
-        log_section_header(logger, "STAGE 1 — DATASET VALIDATION")
-        from src.data.download import acquire_dataset
-        ok = acquire_dataset(args.dataset)
-        if not ok:
-            logger.error(
-                "Dataset '%s' is not ready. "
-                "Follow the instructions above and re-run.",
-                args.dataset,
+        n_classes = len(label_enc.classes_)
+        preprocessed_arrays = {
+            "X_seq": X_seq,
+            "y_labels": y_labels,
+            "label_enc": label_enc,
+            "scaler": scaler,
+            "n_classes": n_classes,
+        }
+
+        import json as _json
+        with open(preprocessed_dir / "metadata.json", "w") as f:
+            _json.dump({
+                "dataset": args.dataset,
+                "n_classes": n_classes,
+                "n_samples": int(X_seq.shape[0]),
+                "n_features": int(X_seq.shape[2]),
+                "sequence_length": int(X_seq.shape[1]),
+                "class_names": label_enc.classes_.tolist(),
+            }, f, indent=2)
+
+        rm.stage_complete("preprocessing", metadata={
+            "n_samples": int(X_seq.shape[0]),
+            "n_classes": n_classes,
+        })
+        pm.end_stage("preprocessing")
+        gc.collect()
+        logger.info("Preprocessing done.")
+
+    # =================================================================
+    # STAGE 2: Sequence building (already done above)
+    # =================================================================
+    if "sequence_build" in stages_to_run:
+        # Sequences were built during preprocessing.
+        # If resumed past preprocessing, this stage just validates.
+        rm.stage_complete("sequence_build")
+        logger.info("Sequence build — already complete (built during preprocessing).")
+
+    # =================================================================
+    # STAGE 3: Train/Val/Test split
+    # =================================================================
+    if "split_save" in stages_to_run:
+        pm.start_stage("split_save")
+        logger.info("━━━ Stage 3/9: Splitting data ━━━")
+
+        data = _ensure_preprocessed()
+        X_seq = data["X_seq"]
+        y_labels = data["y_labels"]
+
+        # Sub-sample if requested
+        if args.subsample is not None and 0 < args.subsample < 1.0:
+            import numpy as np
+
+            n_total = X_seq.shape[0]
+            n_keep = int(n_total * args.subsample)
+            rng = np.random.RandomState(args.seed)
+            indices = rng.choice(n_total, size=n_keep, replace=False)
+            indices.sort()
+            X_seq = X_seq[indices]
+            y_labels = y_labels[indices]
+            logger.info(
+                "Sub-sampled %s → %s rows (%.1f%%)",
+                f"{n_total:,}", f"{n_keep:,}", args.subsample * 100,
             )
+            preprocessed_arrays["X_seq"] = X_seq
+            preprocessed_arrays["y_labels"] = y_labels
+
+        # Split into train / val / test
+        X_train, X_val, X_test, y_train, y_val, y_test, scaler, label_enc = (
+            split_and_save(
+                X_seq,
+                y_labels,
+                data["scaler"],
+                data["label_enc"],
+                preprocessed_dir,
+                seed=args.seed,
+            )
+        )
+        logger.info(
+            "Split — train: %s, val: %s, test: %s",
+            X_train.shape, X_val.shape, X_test.shape,
+        )
+
+        rm.stage_complete("split_save", metadata={
+            "train_shape": list(X_train.shape),
+            "val_shape": list(X_val.shape),
+            "test_shape": list(X_test.shape),
+        })
+        pm.end_stage("split_save")
+        gc.collect()
+        logger.info("Data split done.")
+
+    # =================================================================
+    # Load split data (needed by all subsequent stages)
+    # =================================================================
+    logger.info("Loading split arrays from: %s", preprocessed_dir)
+    X_train, X_val, X_test, y_train, y_val, y_test, scaler, label_enc = (
+        load_split_data(preprocessed_dir)
+    )
+
+    n_classes = _load_n_classes(preprocessed_dir, args.dataset)
+    logger.info(
+        "Loaded — train: %s, val: %s, test: %s, n_classes: %d",
+        X_train.shape, X_val.shape, X_test.shape, n_classes,
+    )
+
+    # =================================================================
+    # STAGE 4: Hyperparameter tuning (optional)
+    # =================================================================
+    if "tuning" in stages_to_run:
+        if args.tune:
+            pm.start_stage("tuning")
+            logger.info("━━━ Stage 4/9: Hyperparameter tuning ━━━")
+
+            from src.tuning.tuner import run_tuning
+
+            best_cfg = run_tuning(
+                X_train, y_train, X_val, y_val,
+                config, args.dataset, n_classes,
+                output_dir=str(config_dir),
+                seed=args.seed,
+            )
+            # Merge best config into main config
+            if best_cfg:
+                for key in ("lstm_units", "dropout", "dense_units", "learning_rate"):
+                    if key in best_cfg:
+                        config["training"][key] = best_cfg[key]
+
+            rm.stage_complete("tuning", metadata={"best_config": best_cfg})
+            pm.end_stage("tuning")
+            gc.collect()
+            logger.info("Tuning done.")
+        else:
+            logger.info("Tuning requested but --tune not set — skipping.")
+            rm.stage_complete("tuning")
+
+    # =================================================================
+    # STAGE 5: Baseline models (RF, SVM, LR)
+    # =================================================================
+    if "baselines" in stages_to_run:
+        if args.skip_baselines:
+            logger.info("Skipping baselines (--skip-baselines).")
+            rm.stage_complete("baselines")
+        else:
+            pm.start_stage("baselines")
+            logger.info("━━━ Stage 5/9: Baseline models ━━━")
+
+            # Auto-sampling: cap at 200K rows for baselines (Req 5-6)
+            import numpy as np
+
+            MAX_BASELINE_SAMPLES = 200_000
+            X_bl = X_train
+            y_bl = y_train
+            if X_train.shape[0] > MAX_BASELINE_SAMPLES:
+                rng = np.random.RandomState(args.seed)
+                idx = rng.choice(
+                    X_train.shape[0], MAX_BASELINE_SAMPLES, replace=False,
+                )
+                idx.sort()
+                X_bl = X_train[idx]
+                y_bl = y_train[idx]
+                logger.info(
+                    "Auto-sampled baselines: %s → %s rows",
+                    f"{X_train.shape[0]:,}", f"{MAX_BASELINE_SAMPLES:,}",
+                )
+
+            fitted = train_all_baselines(X_bl, y_bl, config.get("baselines", {}))
+            baselines_dir.mkdir(parents=True, exist_ok=True)
+            save_all_baselines(fitted, baselines_dir)
+
+            # Evaluate each baseline
+            from src.utils.serialization import load_baseline_model
+
+            results: Dict[str, Any] = {}
+            for name in ["random_forest", "svm", "logistic_regression"]:
+                try:
+                    model = load_baseline_model(name, baselines_dir)
+                    y_pred, y_prob = predict_baseline(model, X_test, name)
+                    metrics = evaluate_model(y_test, y_pred, y_prob, n_classes)
+                    results[name] = {
+                        "accuracy": metrics["accuracy"],
+                        "f1_macro": metrics["f1_macro"],
+                        "f1_weighted": metrics["f1_weighted"],
+                        "training_samples": int(X_bl.shape[0]),
+                    }
+                    logger.info(
+                        "%s — accuracy: %.4f, F1-macro: %.4f",
+                        name, metrics["accuracy"], metrics["f1_macro"],
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Baseline %s failed: %s", name, exc)
+
+            import json as _json
+
+            with open(baselines_dir / "baseline_results.json", "w") as f:
+                _json.dump(results, f, indent=2)
+
+            rm.stage_complete("baselines", metadata={
+                "training_samples": int(X_bl.shape[0]),
+                "models": list(results.keys()),
+            })
+            pm.end_stage("baselines")
+            gc.collect()
+            logger.info("Baselines done.")
+
+    # =================================================================
+    # STAGE 6: LSTM training
+    # =================================================================
+    if "lstm_train" in stages_to_run:
+        pm.start_stage("lstm_train")
+        logger.info("━━━ Stage 6/9: LSTM training ━━━")
+
+        # Build model
+        model = create_model(config, n_classes)
+
+        # Check for existing checkpoint to resume from
+        resume_ckpt_path: Optional[str] = None
+        initial_epoch = 0
+
+        if args.resume:
+            keras_ckpt = final_dir / "lstm_model.keras"
+            h5_ckpt = final_dir / "lstm_model.h5"
+            if keras_ckpt.exists():
+                resume_ckpt_path = str(keras_ckpt)
+            elif h5_ckpt.exists():
+                resume_ckpt_path = str(h5_ckpt)
+
+            if resume_ckpt_path:
+                logger.info("Resuming LSTM from checkpoint: %s", resume_ckpt_path)
+                model = create_model(config, n_classes)
+                model.load_weights(resume_ckpt_path)
+
+                # Determine initial_epoch from saved history
+                history_csv = final_dir / "training_history.csv"
+                if history_csv.exists():
+                    import csv as _csv
+
+                    with open(history_csv, "r") as f:
+                        reader = _csv.DictReader(f)
+                        rows = list(reader)
+                    initial_epoch = len(rows)
+                    logger.info(
+                        "Resuming from epoch %d / %d",
+                        initial_epoch, epochs,
+                    )
+
+        run_full_training(
+            X_train, y_train,
+            X_val, y_val,
+            X_test, y_test,
+            config,
+            n_classes,
+            output_dir=str(final_dir),
+            resume=resume_ckpt_path is not None,
+        )
+
+        rm.stage_complete("lstm_train", metadata={
+            "epochs": epochs,
+            "resumed_from": initial_epoch,
+        })
+        pm.end_stage("lstm_train")
+        gc.collect()
+        logger.info("LSTM training done.")
+
+    # =================================================================
+    # STAGE 7: Evaluation
+    # =================================================================
+    if "evaluation" in stages_to_run:
+        pm.start_stage("evaluation")
+        logger.info("━━━ Stage 7/9: Evaluation ━━━")
+
+        # Load trained LSTM
+        from src.utils.serialization import load_trained_model
+
+        keras_path = final_dir / "lstm_model.keras"
+        h5_path = final_dir / "lstm_model.h5"
+        if keras_path.exists():
+            lstm_model = load_trained_model(str(keras_path))
+        elif h5_path.exists():
+            lstm_model = load_trained_model(str(h5_path))
+        else:
+            logger.error("No trained LSTM found at %s", final_dir)
             sys.exit(1)
 
-        # STAGE 2 — Load data
-        log_section_header(logger, "STAGE 2 — DATA LOADING")
-        from src.data.loaders import load_dataset, get_dataset_summary
-        from src.utils.helpers import save_json
+        y_pred = lstm_model.predict(X_test, verbose=0).argmax(axis=1)
+        n_classes = int(max(y_test.max() + 1, y_pred.max() + 1))
 
-        main_df, _ = load_dataset(
-            args.dataset,
-            merge=True,
-            validate=True,
-            use_20pct_train=args.use_20pct,
+        # Classification report
+        report_csv, report_txt = generate_classification_report(
+            y_test, y_pred, n_classes,
+            output_dir=str(tables_dir),
         )
 
-        # Subsample for memory-constrained environments
-        if args.subsample and 0.0 < args.subsample < 1.0:
-            from sklearn.model_selection import train_test_split
-            n_before = len(main_df)
-            main_df, _ = train_test_split(
-                main_df,
-                train_size=args.subsample,
-                stratify=main_df[main_df.columns[-1]],
-                random_state=42,
-            )
-            main_df = main_df.reset_index(drop=True)
-            logger.info(
-                "Subsampled to %.0f%% — %d → %d rows.",
-                args.subsample * 100, n_before, len(main_df),
-            )
-
-        summary = get_dataset_summary(main_df, args.dataset)
-        save_json(summary, out["tables"] / "dataset_summary.json")
-        logger.info("Dataset loaded: %d rows.", len(main_df))
-
-        # STAGE 3 — EDA
-        if not args.skip_eda:
-            log_section_header(logger, "STAGE 3 — EXPLORATORY DATA ANALYSIS")
-            from src.data.exploratory import run_eda
-            run_eda(main_df, dataset=args.dataset)
-        else:
-            logger.info("EDA skipped (--skip-eda).")
-
-        # STAGE 4 — Preprocessing
-        log_section_header(logger, "STAGE 4 — PREPROCESSING")
-        from src.data.preprocessing import preprocess_dataset
-
-        X_scaled, y, scaler, feature_names, metadata = preprocess_dataset(
-            main_df,
-            dataset=args.dataset,
-            strategy_continuous=cfg.preprocessing.missing_strategy_continuous,
-            strategy_categorical=cfg.preprocessing.missing_strategy_categorical,
-            drop_first=cfg.preprocessing.drop_first,
-            feature_range=cfg.preprocessing.scaler_feature_range,
-            save_interim_files=True,
-            artifacts_dir=processed_dir,
+        # Confusion matrix
+        cm_csv = save_confusion_matrix(
+            y_test, y_pred, n_classes,
+            output_dir=str(tables_dir),
         )
-        n_classes = metadata["n_classes"]
-        logger.info(
-            "Preprocessing complete — X: %s, classes: %d.",
-            X_scaled.shape, n_classes,
-        )
-        # Free raw DataFrame from memory
-        del main_df
+
+        # Per-class metrics
+        per_class = compute_per_class_metrics(y_test, y_pred, n_classes)
+
+        logger.info("Evaluation reports saved to: %s", tables_dir)
+
+        rm.stage_complete("evaluation", metadata={
+            "report_csv": str(report_csv),
+            "cm_csv": str(cm_csv),
+        })
+        pm.end_stage("evaluation")
         gc.collect()
+        logger.info("Evaluation done.")
 
-        # STAGE 5 — Sequence building
-        log_section_header(logger, "STAGE 5 — SEQUENCE BUILDING")
-        from src.data.sequence_builder import (
-            rebuild_sequences_from_flat, get_sequence_stats
-        )
+    # =================================================================
+    # STAGE 8: Visualization
+    # =================================================================
+    if "visualization" in stages_to_run:
+        pm.start_stage("visualization")
+        logger.info("━━━ Stage 8/9: Visualization ━━━")
 
-        X_seq, y_seq = rebuild_sequences_from_flat(
-            X_scaled, y,
-            window_size=cfg.sequence.window_size,
-            step_size=cfg.sequence.step_size,
-            label_position=cfg.sequence.label_position,
-        )
-        seq_stats = get_sequence_stats(
-            X_seq, y_seq, metadata.get("class_names")
-        )
-        logger.info(
-            "Sequences built: %d × (%d, %d).",
-            X_seq.shape[0], X_seq.shape[1], X_seq.shape[2],
-        )
+        figures_dir.mkdir(parents=True, exist_ok=True)
 
-        # STAGE 6 — Split + save
-        log_section_header(logger, "STAGE 6 — TRAIN / VAL / TEST SPLIT")
-        from src.data.split import (
-            split_and_save, split_and_save_disk, get_split_summary,
-        )
-        from src.utils.serialization import save_preprocessing_artifacts
-        from src.utils.serialization import load_processed_arrays
-        from sklearn.preprocessing import LabelEncoder
+        # Training history
+        history_csv = final_dir / "training_history.csv"
+        if history_csv.exists():
+            plot_training_history(str(history_csv), str(figures_dir))
 
-        DISK_SPLIT_THRESHOLD = 200_000
-        use_disk_split = X_seq.shape[0] > DISK_SPLIT_THRESHOLD
+        # Confusion matrix
+        cm_csv = tables_dir / "confusion_matrix.csv"
+        if cm_csv.exists():
+            plot_confusion_matrix(str(cm_csv), str(figures_dir))
 
-        if use_disk_split:
-            logger.info(
-                "Large dataset (%d seqs > %d) — using disk-based "
-                "split to avoid OOM.",
-                X_seq.shape[0], DISK_SPLIT_THRESHOLD,
-            )
-            # Free X_scaled before the split to reclaim RAM.
-            # The split function will handle X_seq internally.
-            del X_scaled
-            gc.collect()
+        # Load LSTM model for predictions
+        from src.utils.serialization import load_trained_model
 
-            split_and_save_disk(
-                X_seq, y_seq,
-                output_dir=processed_dir,
-                train_ratio=cfg.split.train_ratio,
-                val_ratio=cfg.split.val_ratio,
-                test_ratio=cfg.split.test_ratio,
-                stratified=cfg.split.stratified,
-                dataset=args.dataset,
-            )
-            del X_seq, y_seq
-            gc.collect()
-
-            # Reload splits from disk (they are small arrays
-            # that fit easily in RAM)
-            (
-                X_train, X_val, X_test,
-                y_train, y_val, y_test,
-            ) = load_processed_arrays(processed_dir)
-
+        keras_path = final_dir / "lstm_model.keras"
+        h5_path = final_dir / "lstm_model.h5"
+        if keras_path.exists():
+            lstm_model = load_trained_model(str(keras_path))
+        elif h5_path.exists():
+            lstm_model = load_trained_model(str(h5_path))
         else:
-            X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(
-                X_seq, y_seq,
-                output_dir=processed_dir,
-                train_ratio=cfg.split.train_ratio,
-                val_ratio=cfg.split.val_ratio,
-                test_ratio=cfg.split.test_ratio,
-                stratified=cfg.split.stratified,
-                dataset=args.dataset,
-            )
-            # Free sequence arrays from memory
-            del X_seq, y_seq, X_scaled, y
-            gc.collect()
+            lstm_model = None
 
-        # Save preprocessing artifacts to dataset-specific models dir
-        le = LabelEncoder()
-        le.classes_ = np.array(metadata["class_names"])
-        save_preprocessing_artifacts(
-            scaler=scaler,
-            label_encoder=le,
-            feature_names=feature_names,
-            metadata=metadata,
-            output_dir=out["models_final"],
+        if lstm_model is not None:
+            y_pred_proba = lstm_model.predict(X_test, verbose=0)
+
+            # ROC curves (one-vs-rest)
+            plot_roc_curves(
+                y_test, y_pred_proba, n_classes,
+                str(figures_dir),
+            )
+
+            # Per-class ROC
+            plot_per_class_roc(
+                y_test, y_pred_proba, n_classes,
+                str(figures_dir),
+            )
+
+        # Class distribution
+        plot_class_distribution(y_train, str(figures_dir))
+
+        # Feature distributions (sample for speed)
+        plot_feature_distributions(
+            X_train[:1000], str(figures_dir),
         )
 
-        # STAGE 7 — Hyperparameter tuning (optional)
-        if args.tune or cfg.hyperparameter_tuning.enabled:
-            log_section_header(logger, "STAGE 7 — HYPERPARAMETER TUNING")
-            from src.training.hyperparameter_tuning import (
-                run_grid_search, run_random_search
-            )
-            from src.config import override_hyperparameters
+        rm.stage_complete("visualization")
+        pm.end_stage("visualization")
+        gc.collect()
+        logger.info("Visualization done.")
 
-            method = cfg.hyperparameter_tuning.method
-            if method == "random_search":
-                best_params, _ = run_random_search(
-                    X_train, y_train, X_val, y_val,
-                    n_classes=n_classes,
-                    n_trials=cfg.hyperparameter_tuning.n_trials,
-                    config=cfg,
-                )
-            else:
-                best_params, _ = run_grid_search(
-                    X_train, y_train, X_val, y_val,
-                    n_classes=n_classes,
-                    config=cfg,
-                )
-            override_hyperparameters(
-                learning_rate=best_params.get("learning_rate"),
-                batch_size=best_params.get("batch_size"),
-            )
-            logger.info("Best params applied: %s", best_params)
-        else:
-            logger.info("Hyperparameter tuning skipped.")
+    # =================================================================
+    # STAGE 9: Export
+    # =================================================================
+    if "export" in stages_to_run:
+        pm.start_stage("export")
+        logger.info("━━━ Stage 9/9: Export ━━━")
 
-    # STAGE 8 — Training
-    log_section_header(logger, "STAGE 8 — MODEL TRAINING")
-    from src.training.trainer import run_full_training
+        exported_dir = dirs["exported"]
+        exported_dir.mkdir(parents=True, exist_ok=True)
 
-    training_results = run_full_training(
-        X_train, X_val, X_test,
-        y_train, y_val, y_test,
-        n_classes=n_classes,
-        dataset=args.dataset,
-        config=cfg,
-        resume=args.resume,
-        output_dir=out["root"],
-    )
+        # Copy final model
+        import shutil
 
-    # STAGE 9 — Evaluation
-    log_section_header(logger, "STAGE 9 — EVALUATION")
-    from src.evaluation.metrics import compute_metrics, predict_lstm
-    from src.evaluation.classification_report import (
-        generate_classification_report
-    )
-    from src.evaluation.roc_analysis import (
-        compute_roc_curves, plot_roc_curves, save_roc_scores
-    )
-    from src.evaluation.confusion_matrix import plot_confusion_matrix
-    from src.evaluation.comparison import (
-        build_comparison_table, save_evaluation_results
-    )
-    from src.models.baseline_models import predict_baseline
+        for fname in ["lstm_model.keras", "lstm_model.h5"]:
+            src = final_dir / fname
+            dst = exported_dir / fname
+            if src.exists():
+                shutil.copy2(src, dst)
+                logger.info("Exported: %s → %s", src, dst)
 
-    all_metrics = {}
-    class_names = metadata.get("class_names")
+        for fname in ["scaler.pkl", "label_encoder.pkl", "feature_names.pkl", "metadata.json"]:
+            src = preprocessed_dir / fname
+            dst = exported_dir / fname
+            if src.exists():
+                shutil.copy2(src, dst)
+                logger.info("Exported: %s → %s", src, dst)
 
-    # Evaluate LSTM
-    lstm_model = training_results["lstm"].model
-    y_pred_lstm, y_prob_lstm = predict_lstm(lstm_model, X_test)
-    lstm_metrics = compute_metrics(
-        y_test, y_pred_lstm, y_prob_lstm,
-        class_names=class_names,
-        dataset=args.dataset,
-        model_name="LSTM",
-    )
-    all_metrics["LSTM"] = lstm_metrics
+        # Chapter 4 ZIP
+        try:
+            export_chapter4_zip(str(exported_dir))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Chapter 4 ZIP export failed: %s", exc)
 
-    # Evaluate baselines
-    if not args.skip_baselines:
-        for name in ["random_forest", "svm", "logistic_regression"]:
-            if name in training_results:
-                bl_model = training_results[name].model
-                y_pred_bl, y_prob_bl = predict_baseline(
-                    bl_model, X_test, name
-                )
-                bl_metrics = compute_metrics(
-                    y_test, y_pred_bl, y_prob_bl,
-                    class_names=class_names,
-                    dataset=args.dataset,
-                    model_name=name.replace("_", " ").title(),
-                )
-                all_metrics[name.replace("_", " ").title()] = bl_metrics
+        rm.stage_complete("export")
+        pm.end_stage("export")
+        logger.info("Export done.")
 
-    # Classification report
-    generate_classification_report(
-        y_test, y_pred_lstm,
-        class_names=class_names,
-        dataset=args.dataset,
-        model_name="LSTM",
-        output_dir=out["tables"],
-    )
+    # ── Summary ─────────────────────────────────────────────────────
+    logger.info("=" * 60)
+    logger.info("Pipeline completed for dataset: %s", args.dataset)
+    logger.info("Output directory: %s", dirs["root"])
+    logger.info("=" * 60)
 
-    # ROC curves
-    roc_data = compute_roc_curves(
-        y_test, y_prob_lstm, class_names, args.dataset
-    )
-    plot_roc_curves(
-        y_test, y_prob_lstm,
-        class_names=class_names,
-        dataset=args.dataset,
-    )
-    save_roc_scores(
-        roc_data,
-        output_path=out["metrics"] / "roc_auc_scores.json",
-    )
+    # Print progress summary
+    pm.print_summary()
 
-    # Confusion matrix
-    plot_confusion_matrix(
-        y_test, y_pred_lstm,
-        class_names=class_names,
-        dataset=args.dataset,
-    )
 
-    # Save all metrics
-    save_evaluation_results(
-        all_metrics,
-        output_path=out["metrics"] / "evaluation_results.json",
-    )
-    build_comparison_table(
-        all_metrics,
-        output_path=out["tables"] / "baseline_metrics.csv",
-    )
-
-    # STAGE 10 — Generate all Chapter 4 figures
-    log_section_header(logger, "STAGE 10 — GENERATING REPORT FIGURES")
-    from src.visualization.dashboard import (
-        generate_all_report_figures, export_chapter4_zip
-    )
-
-    generate_all_report_figures(
-        history=training_results["lstm"].history,
-        y_true=y_test,
-        y_pred_lstm=y_pred_lstm,
-        y_prob_lstm=y_prob_lstm,
-        all_metrics=all_metrics,
-        dataset=args.dataset,
-        class_names=class_names,
-        input_shape=(cfg.sequence.window_size, X_train.shape[2]),
-        n_classes=n_classes,
-        output_dir=out["figures"],
-    )
-
-    # STAGE 11 — Export ZIP
-    log_section_header(logger, "STAGE 11 — EXPORTING RESULTS")
-    zip_path = export_chapter4_zip(
-        figures_dir=out["figures"],
-        tables_dir=out["tables"],
-        output_dir=out["exported"],
-    )
-    logger.info("Chapter 4 ZIP: %s", zip_path)
-
-    # DONE
-    elapsed = pipeline_timer.stop()
-    log_section_header(logger, "PIPELINE COMPLETE")
-    logger.info("Dataset      : %s", args.dataset)
-    logger.info("Total time   : %.1f s", elapsed)
-    logger.info("LSTM accuracy: %.4f",
-                all_metrics.get("LSTM", {}).get("accuracy", 0))
-    logger.info("LSTM F1 macro: %.4f",
-                all_metrics.get("LSTM", {}).get("f1_macro", 0))
-    logger.info(
-        "\nAll outputs saved to:\n"
-        "  Figures  : %s\n"
-        "  Tables   : %s\n"
-        "  Metrics  : %s\n"
-        "  Model    : %s\n"
-        "  ZIP      : %s",
-        out["figures"], out["tables"], out["metrics"],
-        out["models_final"], zip_path,
-    )
-
+# ─── Entry point ───────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     main()

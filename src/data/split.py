@@ -45,6 +45,12 @@ from src.utils.helpers import (
     validate_array_shapes,
 )
 from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+# Chunk size for disk-based splitting (must be defined before
+# split_and_save which references it as a default parameter).
+SPLIT_CHUNK_SIZE = 100_000
 from src.utils.paths import PROCESSED_DATA_DIR
 from src.utils.serialization import save_processed_arrays
 
@@ -288,8 +294,6 @@ def split_and_save(
 
 
 # Memory-Efficient Disk-Based Split for Large Datasets
-
-SPLIT_CHUNK_SIZE = 100_000
 
 
 def split_and_save_disk(

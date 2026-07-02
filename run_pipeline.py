@@ -65,11 +65,8 @@ from src.data.loaders import load_dataset
 from src.data.preprocessing import preprocess_dataset
 from src.data.sequence_builder import build_sequences, rebuild_sequences_from_flat
 from src.data.split import split_and_save
-from src.evaluation.classification_report import (
-    generate_classification_report,
-    save_confusion_matrix,
-    save_classification_txt,
-)
+from src.evaluation.classification_report import generate_classification_report
+from src.evaluation.confusion_matrix import plot_confusion_matrix
 from src.evaluation.metrics import evaluate_model, compute_per_class_metrics
 from src.models.baseline_models import (
     train_all_baselines,
@@ -91,15 +88,9 @@ from src.utils.serialization import (
     load_split_data_train,
     load_split_data_test,
 )
-from src.visualization.dashboard import (
-    plot_training_history,
-    plot_confusion_matrix,
-    plot_roc_curves,
-    plot_per_class_roc,
-    plot_feature_distributions,
-    plot_class_distribution,
-    export_chapter4_zip,
-)
+from src.visualization.dashboard import export_chapter4_zip
+from src.visualization.training_curves import plot_training_curves
+from src.evaluation.roc_analysis import plot_roc_curves
 
 # Pipeline modules (new)
 from src.pipeline.resume import ResumeManager
@@ -737,15 +728,16 @@ def main() -> None:
         n_classes = int(max(y_test.max() + 1, y_pred.max() + 1))
 
         # Classification report
-        report_csv, report_txt = generate_classification_report(
-            y_test, y_pred, n_classes,
+        report_result = generate_classification_report(
+            y_test, y_pred, dataset=args.dataset,
             output_dir=str(tables_dir),
         )
+        report_csv = report_result.get("csv_path", "")
 
         # Confusion matrix
-        cm_csv = save_confusion_matrix(
-            y_test, y_pred, n_classes,
-            output_dir=str(tables_dir),
+        plot_confusion_matrix(
+            y_test, y_pred, dataset=args.dataset,
+            output_path=str(tables_dir),
         )
 
         # Per-class metrics
@@ -754,8 +746,7 @@ def main() -> None:
         logger.info("Evaluation reports saved to: %s", tables_dir)
 
         rm.stage_complete("evaluation", metadata={
-            "report_csv": str(report_csv),
-            "cm_csv": str(cm_csv),
+            "report_csv": report_csv,
         })
         # Free test data and model from memory
         del X_test, y_test, lstm_model, y_pred
@@ -772,59 +763,57 @@ def main() -> None:
 
         figures_dir.mkdir(parents=True, exist_ok=True)
 
-        # Training history
+        # --- 8a. Training history curves ---
         history_csv = final_dir / "training_history.csv"
         if history_csv.exists():
-            plot_training_history(str(history_csv), str(figures_dir))
+            import csv as _csv
 
-        # Confusion matrix
-        cm_csv = tables_dir / "confusion_matrix.csv"
-        if cm_csv.exists():
-            plot_confusion_matrix(str(cm_csv), str(figures_dir))
+            with open(history_csv, "r") as fh:
+                reader = _csv.DictReader(fh)
+                rows = list(reader)
+            if rows:
+                history_dict: Dict[str, List[float]] = {}
+                for key in rows[0]:
+                    if key in ("epoch",):
+                        continue
+                    history_dict[key] = [float(r[key]) for r in rows]
+                plot_training_curves(
+                    history_dict,
+                    model_name="LSTM",
+                    dataset=args.dataset,
+                    output_dir=figures_dir,
+                )
+            else:
+                logger.warning("Training history CSV is empty: %s", history_csv)
 
-        # Load LSTM model for predictions
+        # --- 8b. ROC curves ---
         from src.utils.serialization import load_trained_model
 
-        # Load test data on-demand for visualization
         X_test_viz, y_test_viz = load_split_data_test(preprocessed_dir)
-        # Reload train data on-demand for class distribution / feature plots
-        X_train_viz, _, y_train_viz, _, _, _ = load_split_data_train(preprocessed_dir)
 
         keras_path = final_dir / "lstm_model.keras"
         h5_path = final_dir / "lstm_model.h5"
+        lstm_model = None
         if keras_path.exists():
             lstm_model = load_trained_model(str(keras_path))
         elif h5_path.exists():
             lstm_model = load_trained_model(str(h5_path))
-        else:
-            lstm_model = None
 
         if lstm_model is not None:
             y_pred_proba = lstm_model.predict(X_test_viz, verbose=0)
 
-            # ROC curves (one-vs-rest)
+            class_names = list(label_enc.classes_)
             plot_roc_curves(
-                y_test_viz, y_pred_proba, n_classes,
-                str(figures_dir),
-            )
-
-            # Per-class ROC
-            plot_per_class_roc(
-                y_test_viz, y_pred_proba, n_classes,
-                str(figures_dir),
+                y_test_viz, y_pred_proba,
+                class_names=class_names,
+                dataset=args.dataset,
+                model_name="LSTM",
+                output_path=figures_dir / "roc_curve.png",
             )
 
             del lstm_model, y_pred_proba
 
-        # Class distribution
-        plot_class_distribution(y_train_viz, str(figures_dir))
-
-        # Feature distributions (sample for speed)
-        plot_feature_distributions(
-            X_train_viz[:1000], str(figures_dir),
-        )
-
-        del X_test_viz, y_test_viz, X_train_viz, y_train_viz
+        del X_test_viz, y_test_viz
 
         rm.stage_complete("visualization")
         pm.end_stage("visualization")

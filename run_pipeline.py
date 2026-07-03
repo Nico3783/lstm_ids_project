@@ -74,8 +74,6 @@ from src.models.baseline_models import (
     load_all_baselines,
     predict_baseline,
 )
-from src.models.lstm_model import build_lstm_model
-from src.models.model_factory import create_model
 from src.training.trainer import run_full_training
 from src.config import reload_config
 from src.utils.helpers import set_global_seed as set_seed
@@ -408,15 +406,22 @@ def main() -> None:
         logger.info("━━━ Stage 1/9: Preprocessing ━━━")
 
         logger.info("Loading raw dataset: %s ...", args.dataset)
-        df_raw = load_dataset(args.dataset)
+        df_raw, df_test_unused = load_dataset(args.dataset)
         logger.info("Raw shape: %s", df_raw.shape)
 
-        df, feat_enc, label_enc, scaler, X_seq, y_labels = preprocess_dataset(
-            df_raw, config, dataset_name=args.dataset
+        X_seq, y_labels, scaler, feature_names, metadata = preprocess_dataset(
+            df_raw, dataset=args.dataset
         )
+
+        # Build a LabelEncoder from metadata for downstream compatibility
+        from sklearn.preprocessing import LabelEncoder as _LE
+        label_enc = _LE()
+        label_enc.classes_ = np.array(metadata["class_names"])
+
+        n_classes = int(metadata["n_classes"])
         logger.info(
             "After preprocessing — sequences: %s, classes: %d",
-            X_seq.shape, len(label_enc.classes_),
+            X_seq.shape, n_classes,
         )
 
         # Persist preprocessed arrays
@@ -430,12 +435,7 @@ def main() -> None:
         with open(preprocessed_dir / "scaler.pkl", "wb") as f:
             _pkl.dump(scaler, f)
         with open(preprocessed_dir / "feature_names.pkl", "wb") as f:
-            _pkl.dump(
-                list(df.columns.drop("label", errors="ignore")),
-                f,
-            )
-
-        n_classes = len(label_enc.classes_)
+            _pkl.dump(feature_names, f)
         preprocessed_arrays = {
             "X_seq": X_seq,
             "y_labels": y_labels,
@@ -460,7 +460,7 @@ def main() -> None:
             "n_classes": n_classes,
         })
         # Free raw DataFrame from memory — no longer needed
-        del df_raw, df
+        del df_raw, scaler, label_enc, feature_names
         pm.end_stage("preprocessing")
         gc.collect()
         logger.info("Preprocessing done.")
@@ -504,14 +504,13 @@ def main() -> None:
             preprocessed_arrays["y_labels"] = y_labels
 
         # Split into train / val / test
-        X_train, X_val, X_test, y_train, y_val, y_test, scaler, label_enc = (
+        X_train, X_val, X_test, y_train, y_val, y_test = (
             split_and_save(
                 X_seq,
                 y_labels,
-                data["scaler"],
-                data["label_enc"],
                 preprocessed_dir,
                 seed=args.seed,
+                dataset=args.dataset,
             )
         )
         logger.info(
@@ -525,7 +524,7 @@ def main() -> None:
             "test_shape": list(X_test.shape),
         })
         # Free all split arrays — they're saved to disk; loaded lazily later
-        del X_train, X_val, X_test, y_train, y_val, y_test, scaler, label_enc
+        del X_train, X_val, X_test, y_train, y_val, y_test
         del X_seq, y_labels
         if preprocessed_arrays is not None:
             preprocessed_arrays.clear()
@@ -664,40 +663,8 @@ def main() -> None:
         pm.start_stage("lstm_train")
         logger.info("━━━ Stage 6/9: LSTM training ━━━")
 
-        # Build model
-        model = create_model(model_type="lstm", n_classes=n_classes)
-
-        # Check for existing checkpoint to resume from
-        resume_ckpt_path: Optional[str] = None
-        initial_epoch = 0
-
-        if args.resume:
-            keras_ckpt = final_dir / "lstm_model.keras"
-            h5_ckpt = final_dir / "lstm_model.h5"
-            if keras_ckpt.exists():
-                resume_ckpt_path = str(keras_ckpt)
-            elif h5_ckpt.exists():
-                resume_ckpt_path = str(h5_ckpt)
-
-            if resume_ckpt_path:
-                logger.info("Resuming LSTM from checkpoint: %s", resume_ckpt_path)
-                model = create_model(model_type="lstm", n_classes=n_classes)
-                model.load_weights(resume_ckpt_path)
-
-                # Determine initial_epoch from saved history
-                history_csv = final_dir / "training_history.csv"
-                if history_csv.exists():
-                    import csv as _csv
-
-                    with open(history_csv, "r") as f:
-                        reader = _csv.DictReader(f)
-                        rows = list(reader)
-                    initial_epoch = len(rows)
-                    logger.info(
-                        "Resuming from epoch %d / %d",
-                        initial_epoch, epochs,
-                    )
-
+        # run_full_training() handles checkpoint resume internally via
+        # train_lstm() which loads weights from config.training.model_checkpoint.filepath
         run_full_training(
             X_train, X_val,
             y_train, y_val,
@@ -705,12 +672,12 @@ def main() -> None:
             dataset=args.dataset,
             config=config,
             output_dir=str(final_dir),
-            resume=resume_ckpt_path is not None,
+            resume=args.resume,
         )
 
         rm.stage_complete("lstm_train", metadata={
             "epochs": epochs,
-            "resumed_from": initial_epoch,
+            "resumed": args.resume,
         })
         pm.end_stage("lstm_train")
         gc.collect()

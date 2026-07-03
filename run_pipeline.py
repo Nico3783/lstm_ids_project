@@ -67,7 +67,7 @@ from src.data.sequence_builder import build_sequences, rebuild_sequences_from_fl
 from src.data.split import split_and_save
 from src.evaluation.classification_report import generate_classification_report
 from src.evaluation.confusion_matrix import plot_confusion_matrix
-from src.evaluation.metrics import evaluate_model, compute_per_class_metrics
+from src.evaluation.metrics import compute_metrics
 from src.models.baseline_models import (
     train_all_baselines,
     save_all_baselines,
@@ -613,7 +613,7 @@ def main() -> None:
                 try:
                     model = load_baseline_model(name, baselines_dir)
                     y_pred, y_prob = predict_baseline(model, X_test, name)
-                    metrics = evaluate_model(y_test, y_pred, y_prob, n_classes)
+                    metrics = compute_metrics(y_test, y_pred, y_prob, dataset=args.dataset, model_name=name)
                     results[name] = {
                         "accuracy": metrics["accuracy"],
                         "f1_macro": metrics["f1_macro"],
@@ -740,8 +740,10 @@ def main() -> None:
             output_path=str(tables_dir),
         )
 
-        # Per-class metrics
-        per_class = compute_per_class_metrics(y_test, y_pred, n_classes)
+        # Per-class metrics (via compute_metrics)
+        full_metrics = compute_metrics(
+            y_test, y_pred, dataset=args.dataset, model_name="LSTM",
+        )
 
         logger.info("Evaluation reports saved to: %s", tables_dir)
 

@@ -78,7 +78,7 @@ from src.models.lstm_model import build_lstm_model
 from src.models.model_factory import create_model
 from src.training.trainer import run_full_training
 from src.utils.config import load_config
-from src.utils.helpers import set_seed
+from src.utils.helpers import set_global_seed as set_seed
 from src.utils.logger import get_logger
 from src.utils.paths import get_dataset_output_dirs
 from src.utils.serialization import (
@@ -684,8 +684,8 @@ def main() -> None:
                     )
 
         run_full_training(
-            X_train, y_train,
-            X_val, y_val,
+            X_train, X_val,
+            y_train, y_val,
             n_classes=n_classes,
             dataset=args.dataset,
             config=config,
@@ -712,7 +712,7 @@ def main() -> None:
         X_test, y_test = load_split_data_test(preprocessed_dir)
 
         # Load trained LSTM
-        from src.utils.serialization import load_trained_model
+        from src.utils.serialization import load_keras_model as load_trained_model
 
         keras_path = final_dir / "lstm_model.keras"
         h5_path = final_dir / "lstm_model.h5"
@@ -789,7 +789,7 @@ def main() -> None:
                 logger.warning("Training history CSV is empty: %s", history_csv)
 
         # --- 8b. ROC curves ---
-        from src.utils.serialization import load_trained_model
+        from src.utils.serialization import load_keras_model as load_trained_model
 
         X_test_viz, y_test_viz = load_split_data_test(preprocessed_dir)
 

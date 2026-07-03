@@ -485,7 +485,10 @@ def assert_file_exists(path: Path, description: str = "") -> None:
         )
 
 
-def get_dataset_output_dirs(dataset: str) -> dict:
+def get_dataset_output_dirs(
+    dataset: str,
+    output_base: Optional[str] = None,
+) -> dict:
     """
     Return a dictionary of dataset-specific output directories.
 
@@ -494,22 +497,25 @@ def get_dataset_output_dirs(dataset: str) -> dict:
 
     Structure::
 
-        outputs/<dataset>/                          (root)
-        outputs/<dataset>/models/checkpoints/
-        outputs/<dataset>/models/final/
-        outputs/<dataset>/models/baselines/
-        outputs/<dataset>/reports/figures/
-        outputs/<dataset>/reports/tables/
-        outputs/<dataset>/reports/metrics/
-        outputs/<dataset>/reports/logs/
-        outputs/<dataset>/predictions/
-        outputs/<dataset>/exported/
+        <output_base>/<dataset>/                          (root)
+        <output_base>/<dataset>/models/checkpoints/
+        <output_base>/<dataset>/models/final/
+        <output_base>/<dataset>/models/baselines/
+        <output_base>/<dataset>/reports/figures/
+        <output_base>/<dataset>/reports/tables/
+        <output_base>/<dataset>/reports/metrics/
+        <output_base>/<dataset>/reports/logs/
+        <output_base>/<dataset>/predictions/
+        <output_base>/<dataset>/exported/
 
     Parameters
     ----------
     dataset : str
         Dataset identifier — one of ``nsl_kdd``, ``cicids2017``,
         ``unsw_nb15``.
+    output_base : str, optional
+        Override root directory.  Defaults to the project-level
+        ``outputs/`` directory.
 
     Returns
     -------
@@ -527,7 +533,7 @@ def get_dataset_output_dirs(dataset: str) -> dict:
             f"Choose from: {sorted(valid)}"
         )
 
-    root = OUTPUTS_DIR / dataset
+    root = Path(output_base) / dataset if output_base else OUTPUTS_DIR / dataset
 
     dirs = {
         "root":                root,

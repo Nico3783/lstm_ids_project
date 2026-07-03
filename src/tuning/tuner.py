@@ -48,8 +48,8 @@ def run_tuning(
     dict or None
         Best hyperparameter configuration, or None if no improvement.
     """
-    max_epochs = config.get("training", {}).get("epochs", 100)
-    patience = config.get("training", {}).get("patience", 10)
+    max_epochs = config.training.epochs
+    patience = config.training.early_stopping.patience
 
     logger.info(
         "Starting hyperparameter tuning for %s (max_epochs=%d, patience=%d)",

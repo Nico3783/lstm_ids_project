@@ -77,14 +77,13 @@ from src.models.baseline_models import (
 from src.models.lstm_model import build_lstm_model
 from src.models.model_factory import create_model
 from src.training.trainer import run_full_training
-from src.utils.config import load_config
+from src.config import reload_config
 from src.utils.helpers import set_global_seed as set_seed
 from src.utils.logger import get_logger
 from src.utils.paths import get_dataset_output_dirs
 from src.utils.serialization import (
     save_processed_arrays,
     load_processed_arrays,
-    load_split_data,
     load_split_data_train,
     load_split_data_test,
 )
@@ -263,12 +262,25 @@ def _load_n_classes(preprocessed_dir: Path, dataset: str) -> int:
 
 
 def _setup_output_dirs(output_base: str, dataset: str) -> Dict[str, Path]:
-    """Create and return the per-dataset output directory structure."""
+    """Create and return the per-dataset output directory structure.
+
+    ``get_dataset_output_dirs`` provides the core keys.  This helper
+    adds the aliases that ``main()`` expects and creates every
+    subdirectory.
+    """
     dirs = get_dataset_output_dirs(dataset, output_base)
-    for key in ("preprocessed", "baselines", "final", "tables", "figures",
-                "metrics", "logs", "config", "exported", "predictions"):
-        d = dirs.get(key) or (dirs["root"] / key)
-        d.mkdir(parents=True, exist_ok=True)
+
+    # Aliases expected by main() — map friendly names to real paths
+    dirs["preprocessed"] = dirs["root"] / "preprocessed"
+    dirs["baselines"]    = dirs["models_baselines"]
+    dirs["final"]        = dirs["models_final"]
+    dirs["config"]       = dirs["root"] / "config"
+
+    # Create every directory
+    for d in dirs.values():
+        if isinstance(d, Path):
+            d.mkdir(parents=True, exist_ok=True)
+
     return dirs
 
 
@@ -303,7 +315,7 @@ def main() -> None:
     if not config_path.exists():
         logger.error("Config file not found: %s", config_path)
         sys.exit(1)
-    config = load_config(str(config_path))
+    config = reload_config(str(config_path))
     logger.info("Config loaded: %s", config_path)
 
     # ── Seed ─────────────────────────────────────────────────────────
@@ -361,15 +373,15 @@ def main() -> None:
 
     # ── Training config overrides ──────────────────────────────────
     if args.epochs is not None:
-        config["training"]["epochs"] = args.epochs
+        config.training.epochs = args.epochs
     if args.batch_size is not None:
-        config["training"]["batch_size"] = args.batch_size
+        config.training.batch_size = args.batch_size
     if args.learning_rate is not None:
-        config["training"]["learning_rate"] = args.learning_rate
+        config.model.learning_rate = args.learning_rate
     if args.sequence_length is not None:
-        config["preprocessing"]["sequence_length"] = args.sequence_length
+        config.sequence.window_size = args.sequence_length
 
-    epochs = config["training"]["epochs"]
+    epochs = config.training.epochs
 
     # Determine which stages to run
     stages_to_run = plan["to_run"] if plan else list(CheckpointManager.STAGES)
@@ -558,7 +570,10 @@ def main() -> None:
             if best_cfg:
                 for key in ("lstm_units", "dropout", "dense_units", "learning_rate"):
                     if key in best_cfg:
-                        config["training"][key] = best_cfg[key]
+                        if key == "learning_rate":
+                            config.model.learning_rate = best_cfg[key]
+                        else:
+                            setattr(config.model, key, best_cfg[key])
 
             rm.stage_complete("tuning", metadata={"best_config": best_cfg})
             pm.end_stage("tuning")
@@ -598,7 +613,7 @@ def main() -> None:
                     f"{X_train.shape[0]:,}", f"{MAX_BASELINE_SAMPLES:,}",
                 )
 
-            fitted = train_all_baselines(X_bl, y_bl, config.get("baselines", {}))
+            fitted = train_all_baselines(X_bl, y_bl, config.raw.get("baselines", {}))
             baselines_dir.mkdir(parents=True, exist_ok=True)
             save_all_baselines(fitted, baselines_dir)
 
@@ -650,7 +665,7 @@ def main() -> None:
         logger.info("━━━ Stage 6/9: LSTM training ━━━")
 
         # Build model
-        model = create_model(config, n_classes)
+        model = create_model(model_type="lstm", n_classes=n_classes)
 
         # Check for existing checkpoint to resume from
         resume_ckpt_path: Optional[str] = None
@@ -666,7 +681,7 @@ def main() -> None:
 
             if resume_ckpt_path:
                 logger.info("Resuming LSTM from checkpoint: %s", resume_ckpt_path)
-                model = create_model(config, n_classes)
+                model = create_model(model_type="lstm", n_classes=n_classes)
                 model.load_weights(resume_ckpt_path)
 
                 # Determine initial_epoch from saved history
@@ -851,7 +866,11 @@ def main() -> None:
 
         # Chapter 4 ZIP
         try:
-            export_chapter4_zip(str(exported_dir))
+            export_chapter4_zip(
+                figures_dir=figures_dir,
+                tables_dir=tables_dir,
+                output_dir=exported_dir,
+            )
         except Exception as exc:  # noqa: BLE001
             logger.warning("Chapter 4 ZIP export failed: %s", exc)
 

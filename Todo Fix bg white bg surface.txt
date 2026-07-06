@@ -1,0 +1,11 @@
+▼Todo
+[•] Fix bg-white → bg-surface-container-lowest in 13 UI components
+[ ] Fix bg-green-600/border-green-500 → Stitch tokens across ~100+ occurrences in pages
+[ ] Migrate old CSS variable aliases (text-muted-foreground, bg-background, bg-card, etc.) to MD3 tokens in ~30 component files
+[ ] Fix inline fontFamily → Tailwind font-display tokens
+[ ] Remove console.log from search and categories pages
+[ ] Run tsc --noEmit to verify no type errors
+
+
+
+https://stitch.withgoogle.com/projects/18423404704254784094

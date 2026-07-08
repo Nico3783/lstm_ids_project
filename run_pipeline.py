@@ -294,6 +294,18 @@ def main() -> None:
     )
     logger.info("Pipeline started — dataset: %s", args.dataset)
 
+    # ── Colab keepalive — prints heartbeat every 5 min ────────────
+    import threading
+
+    _keepalive_stop = threading.Event()
+
+    def _keepalive():
+        while not _keepalive_stop.wait(300):
+            logger.info("[KEEPALIVE] still running ...")
+
+    _ka_thread = threading.Thread(target=_keepalive, daemon=True)
+    _ka_thread.start()
+
     # ── Output directories ──────────────────────────────────────────
     output_base = args.output_dir or "outputs"
     dirs = _setup_output_dirs(output_base, args.dataset)
@@ -557,12 +569,14 @@ def main() -> None:
         pm.start_stage("split_save")
         logger.info("━━━ Stage 3/9: Splitting data ━━━")
 
-        data = _ensure_preprocessed()
-        X_seq = data["X_seq"]
-        y_labels = data["y_labels"]
+        # Load y_labels (small) and pass X file path directly
+        # to avoid loading the 7.5 GB array into RAM
+        y_labels = np.load(str(preprocessed_dir / "y_labels.npy"))
+        x_npy_path = str(preprocessed_dir / "X_sequences.npy")
 
         # Sub-sample if requested
         if args.subsample is not None and 0 < args.subsample < 1.0:
+            X_seq = np.load(x_npy_path)
             n_total = X_seq.shape[0]
             n_keep = int(n_total * args.subsample)
             rng = np.random.RandomState(args.seed)
@@ -574,17 +588,23 @@ def main() -> None:
                 "Sub-sampled %s → %s rows (%.1f%%)",
                 f"{n_total:,}", f"{n_keep:,}", args.subsample * 100,
             )
-            preprocessed_arrays["X_seq"] = X_seq
-            preprocessed_arrays["y_labels"] = y_labels
+            # Save sub-sampled X to temp and pass path
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".npy", delete=False) as tmp:
+                tmp_path = tmp.name
+            np.save(tmp_path, X_seq)
+            del X_seq
+            gc.collect()
+            x_npy_path = tmp_path
 
-        # Split into train / val / test
+        # Split — pass x_path to skip loading into RAM
         X_train, X_val, X_test, y_train, y_val, y_test = (
             split_and_save(
-                X_seq,
-                y_labels,
-                preprocessed_dir,
+                y=y_labels,
+                output_dir=preprocessed_dir,
                 random_state=args.seed,
                 dataset=args.dataset,
+                x_path=x_npy_path,
             )
         )
         logger.info(
@@ -919,6 +939,7 @@ def main() -> None:
         logger.info("Export done.")
 
     # ── Summary ─────────────────────────────────────────────────────
+    _keepalive_stop.set()
     logger.info("=" * 60)
     logger.info("Pipeline completed for dataset: %s", args.dataset)
     logger.info("Output directory: %s", dirs["root"])

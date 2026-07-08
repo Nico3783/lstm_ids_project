@@ -192,8 +192,8 @@ def split_sequences(
 # Convenience: Split + Save
 
 def split_and_save(
-    X: np.ndarray,
-    y: np.ndarray,
+    X: np.ndarray = None,
+    y: np.ndarray = None,
     output_dir: Optional[Path] = None,
     train_ratio: float = TRAIN_RATIO,
     val_ratio: float = VAL_RATIO,
@@ -202,6 +202,7 @@ def split_and_save(
     random_state: int = RANDOM_SEED,
     dataset: str = "nsl_kdd",
     chunk_size: int = SPLIT_CHUNK_SIZE,
+    x_path: str = None,
 ) -> Tuple[
     np.ndarray, np.ndarray, np.ndarray,
     np.ndarray, np.ndarray, np.ndarray,
@@ -213,10 +214,14 @@ def split_and_save(
     delegates to the disk-based ``split_and_save_disk`` to
     avoid excessive RAM usage.
 
+    If ``x_path`` is provided and ``X`` is None, reads directly
+    from the file — avoids loading a 7.5 GB array into RAM
+    just to write it to a temp file again.
+
     Parameters
     ----------
-    X : np.ndarray
-        3-D sequence array.
+    X : np.ndarray, optional
+        3-D sequence array.  Ignored when ``x_path`` is given.
     y : np.ndarray
         1-D label array.
     output_dir : Path, optional
@@ -229,32 +234,42 @@ def split_and_save(
         Dataset identifier — used only for logging.
     chunk_size : int
         Rows per chunk for disk-based splitting.
+    x_path : str, optional
+        Path to an existing ``.npy`` file on disk.  When
+        provided, skips loading into RAM entirely.
 
     Returns
     -------
     tuple of six np.ndarray
         ``(X_train, X_val, X_test, y_train, y_val, y_test)``
     """
-    # Auto-select disk-based splitting for large datasets
+    # Disk-based path: either x_path given, or X is large
     LARGE_THRESHOLD = 200_000
-    if X.shape[0] > LARGE_THRESHOLD:
-        logger.info(
-            "Dataset has %s sequences (> %s) — "
-            "using disk-based split to reduce peak RAM.",
-            f"{X.shape[0]:,}", f"{LARGE_THRESHOLD:,}",
-        )
+    use_disk = False
+    effective_x_path = x_path
+
+    if x_path is not None and X is None:
+        use_disk = True
+    elif X is not None and X.shape[0] > LARGE_THRESHOLD:
+        use_disk = True
         # Write X to temp file and free from RAM
         import tempfile
         with tempfile.NamedTemporaryFile(
             suffix=".npy", delete=False,
         ) as tmp:
-            tmp_path = tmp.name
-        np.save(tmp_path, X)
+            effective_x_path = tmp.name
+        np.save(effective_x_path, X)
         del X
         import gc
         gc.collect()
+
+    if use_disk:
+        logger.info(
+            "Dataset uses disk-based split — dataset: %s",
+            dataset,
+        )
         return split_and_save_disk(
-            tmp_path, y,
+            effective_x_path, y,
             output_dir=output_dir,
             train_ratio=train_ratio,
             val_ratio=val_ratio,
@@ -312,65 +327,19 @@ def split_and_save_disk(
     np.ndarray, np.ndarray, np.ndarray,
 ]:
     """
-    Memory-efficient version of ``split_and_save`` for large
-    datasets (CICIDS2017, UNSW-NB15) that exceed available RAM
-    when the standard sklearn-based split creates intermediate
-    copies.
+    Memory-efficient split for large datasets.
 
-    Strategy
-    --------
-    1. The caller writes *X* to a temporary ``.npy`` file
-       (``x_path``) and frees the original array from RAM
-       *before* calling this function.  This is critical —
-       the function never holds the full X array.
-    2. Memory-map the temp file (read-only) — zero extra RAM.
-    3. Split only an index array ``np.arange(n)`` using
-       ``train_test_split`` — tiny memory footprint.
-    4. Write each split's rows to output ``.npy`` files in
-       *chunk_size* batches using ``np.memmap`` — only the
-       active chunk is in RAM at any time.
-    5. Write *y* splits directly (small 1-D arrays).
-    6. Clean up the temp file, then load the saved splits
-       back into RAM via ``load_processed_arrays``.
+    Memory-maps the source file, splits indices, writes each
+    split directly to .npy via chunked reads — no memmap
+    intermediate, no temp copies, no reload at the end.
 
-    Peak RAM: ``~1 chunk`` ≈ ``~0.8 GB`` for CICIDS2017,
-    vs. ``~19 GB`` for the in-memory version.
-
-    Parameters
-    ----------
-    x_path : str
-        Path to the ``.npy`` file containing the 3-D sequence
-        array.  Written by the caller to free the in-memory
-        array before calling this function.
-    y : np.ndarray
-        1-D integer label array of shape ``(n_sequences,)``.
-        Kept in RAM (small: ~20 MB for CICIDS2017).
-    output_dir : Path, optional
-        Save directory.  Defaults to ``data/processed/``.
-    train_ratio, val_ratio, test_ratio : float
-        Split proportions (must sum to 1.0).
-    stratified : bool
-        Use stratified splitting.  Default True.
-    random_state : int
-        Random seed for reproducibility.
-    dataset : str
-        Dataset identifier — used only for logging.
-    chunk_size : int
-        Rows written per batch during the chunked copy phase.
-        Default: 100 000.
-
-    Returns
-    -------
-    tuple of six np.ndarray
-        ``(X_train, X_val, X_test, y_train, y_val, y_test)``
+    Peak RAM: ~1 chunk (~0.8 GB for CICIDS2017).
     """
     import gc
-    import shutil
-    import tempfile
 
     out_dir = Path(output_dir or PROCESSED_DATA_DIR)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # ---- Step 1: mmap the X file (zero extra RAM) ----
     logger.info("=" * 60)
     logger.info(
         "DISK-BASED SPLIT — dataset: %s (x_path: %s)",
@@ -378,19 +347,16 @@ def split_and_save_disk(
     )
     logger.info("=" * 60)
 
+    # ---- Step 1: mmap source (zero extra RAM) ----
     X_mmap = np.load(x_path, mmap_mode="r")
-    n_total = X_mmap.shape[0]
-    window_size = X_mmap.shape[1]
-    n_features = X_mmap.shape[2]
-
+    n_total, window_size, n_features = X_mmap.shape
     logger.info(
         "Loaded X via mmap — shape %s, dtype %s.",
         X_mmap.shape, X_mmap.dtype,
     )
 
-    # ---- Step 2: split indices (tiny footprint) ----
+    # ---- Step 2: split indices ----
     _validate_ratios(train_ratio, val_ratio, test_ratio)
-
     idx = np.arange(n_total)
 
     idx_trainval, idx_test, _, _ = train_test_split(
@@ -400,7 +366,6 @@ def split_and_save_disk(
         shuffle=True,
         stratify=y if stratified else None,
     )
-
     val_size_relative = val_ratio / (train_ratio + val_ratio)
     idx_train, idx_val, _, _ = train_test_split(
         idx_trainval, y[idx_trainval],
@@ -409,21 +374,14 @@ def split_and_save_disk(
         shuffle=True,
         stratify=y[idx_trainval] if stratified else None,
     )
-
     logger.info(
         "Index split — train: %d, val: %d, test: %d",
         len(idx_train), len(idx_val), len(idx_test),
     )
-
-    # Free the full index arrays — we only need the sorted
-    # versions from here on.
     del idx, idx_trainval
     gc.collect()
 
-    # ---- Step 3: write X splits using memmap (peak ~1 chunk) ----
-    out_dir.mkdir(parents=True, exist_ok=True)
-    tmp_dir = Path(tempfile.mkdtemp(prefix="split_"))
-
+    # ---- Step 3: write each split directly to .npy ----
     from src.utils.constants import (
         X_TRAIN_NPY, X_VAL_NPY, X_TEST_NPY,
         Y_TRAIN_NPY, Y_VAL_NPY, Y_TEST_NPY,
@@ -437,41 +395,30 @@ def split_and_save_disk(
 
     for indices, x_name, y_name, split_name in split_specs:
         n_split = len(indices)
-        x_out_path = out_dir / x_name
-        y_out_path = out_dir / y_name
-
-        # Sort indices for sequential disk reads (faster I/O)
         sorted_idx = np.sort(indices)
 
-        # Create memmap output — only header on disk for now;
-        # the kernel maps pages on demand as we write.
-        tmp_memmap = tmp_dir / f"X_{split_name}_raw.npy"
-        X_split = np.memmap(
-            str(tmp_memmap),
-            dtype=np.float32,
-            mode="w+",
-            shape=(n_split, window_size, n_features),
-        )
+        # Pre-allocate output array in RAM
+        X_split = np.empty((n_split, window_size, n_features), dtype=np.float32)
 
         for chunk_start in range(0, n_split, chunk_size):
             chunk_end = min(chunk_start + chunk_size, n_split)
             chunk_idx = sorted_idx[chunk_start:chunk_end]
             X_split[chunk_start:chunk_end] = X_mmap[chunk_idx]
-            X_split.flush()
-            if chunk_start % (chunk_size * 5) == 0 or chunk_end == n_split:
-                logger.info(
-                    "  %s: rows %d–%d / %d written.",
-                    split_name, chunk_start, chunk_end, n_split,
-                )
+            # Log every chunk to prevent Colab cell timeout
+            logger.info(
+                "  %s: rows %d–%d / %d written.",
+                split_name, chunk_start, chunk_end, n_split,
+            )
 
-        # Save as standard .npy (compact, header included)
-        np.save(str(x_out_path), np.array(X_split))
+        # Save directly — no memmap intermediate
+        x_out_path = out_dir / x_name
+        np.save(str(x_out_path), X_split)
         del X_split
         gc.collect()
 
         # y split — small, write directly
         y_split = y[indices]
-        np.save(str(y_out_path), y_split)
+        np.save(str(out_dir / y_name), y_split)
         del y_split
         gc.collect()
 
@@ -481,14 +428,10 @@ def split_and_save_disk(
             x_out_path,
         )
 
-    # ---- Step 4: clean up temp files ----
     del X_mmap
-    shutil.rmtree(tmp_dir, ignore_errors=True)
     gc.collect()
 
-    logger.info("Temp files cleaned up.")
-
-    # ---- Step 5: validate label consistency ----
+    # ---- Step 4: validate label consistency ----
     y_train = np.load(str(out_dir / Y_TRAIN_NPY))
     y_val   = np.load(str(out_dir / Y_VAL_NPY))
     y_test  = np.load(str(out_dir / Y_TEST_NPY))
@@ -496,7 +439,7 @@ def split_and_save_disk(
     del y_train, y_val, y_test
     gc.collect()
 
-    # ---- Step 6: log summary ----
+    # ---- Step 5: log summary (mmap — no extra RAM) ----
     X_tr = np.load(str(out_dir / X_TRAIN_NPY), mmap_mode="r")
     X_v  = np.load(str(out_dir / X_VAL_NPY),   mmap_mode="r")
     X_te = np.load(str(out_dir / X_TEST_NPY),  mmap_mode="r")

@@ -619,7 +619,7 @@ def main() -> None:
         })
         # Free all split arrays — they're saved to disk; loaded lazily later
         del X_train, X_val, X_test, y_train, y_val, y_test
-        del X_seq, y_labels
+        del y_labels
         if preprocessed_arrays is not None:
             preprocessed_arrays.clear()
             preprocessed_arrays = None

@@ -389,12 +389,29 @@ def main() -> None:
     preprocessed_arrays: Optional[Dict[str, Any]] = None
 
     def _ensure_preprocessed() -> Dict[str, Any]:
-        """Load preprocessed arrays if not already loaded."""
+        """Load preprocessed arrays (X_seq, y_labels) if not already loaded."""
         nonlocal preprocessed_arrays
-        if preprocessed_arrays is not None:
+        if preprocessed_arrays is not None and "X_seq" in preprocessed_arrays:
             return preprocessed_arrays
         logger.info("Loading preprocessed arrays from: %s", preprocessed_dir)
-        preprocessed_arrays = load_processed_arrays(preprocessed_dir)
+        X_seq = np.load(str(preprocessed_dir / "X_sequences.npy"))
+        y_labels = np.load(str(preprocessed_dir / "y_labels.npy"))
+
+        # Try to recover n_classes from metadata
+        import json as _json
+        meta_path = preprocessed_dir / "metadata.json"
+        n_classes = int(np.max(y_labels)) + 1
+        if meta_path.exists():
+            with open(meta_path) as f:
+                meta = _json.load(f)
+            n_classes = meta.get("n_classes", n_classes)
+
+        preprocessed_arrays = {
+            "X_seq": X_seq,
+            "y_labels": y_labels,
+            "n_classes": n_classes,
+        }
+        logger.info("Loaded — X: %s  y: %s  classes: %d", X_seq.shape, y_labels.shape, n_classes)
         return preprocessed_arrays
 
     # =================================================================
@@ -449,9 +466,10 @@ def main() -> None:
                 "dataset": args.dataset,
                 "n_classes": n_classes,
                 "n_samples": int(X_seq.shape[0]),
-                "n_features": int(X_seq.shape[2]),
-                "sequence_length": int(X_seq.shape[1]),
+                "n_features": int(len(feature_names)),
+                "sequence_length": config.window_size,
                 "class_names": label_enc.classes_.tolist(),
+                "note": "X_seq is 2D here; 3D sequences built in stage 2",
             }, f, indent=2)
 
         rm.stage_complete("preprocessing", metadata={
@@ -465,13 +483,72 @@ def main() -> None:
         logger.info("Preprocessing done.")
 
     # =================================================================
-    # STAGE 2: Sequence building (already done above)
+    # STAGE 2: Sequence building (2D → 3D via sliding window)
     # =================================================================
     if "sequence_build" in stages_to_run:
-        # Sequences were built during preprocessing.
-        # If resumed past preprocessing, this stage just validates.
-        rm.stage_complete("sequence_build")
-        logger.info("Sequence build — already complete (built during preprocessing).")
+        pm.start_stage("sequence_build")
+        logger.info("━━━ Stage 2/9: Building sequences ━━━")
+
+        # Load 2D preprocessed arrays from Stage 1
+        X_2d = np.load(str(preprocessed_dir / "X_sequences.npy"))
+        y_1d = np.load(str(preprocessed_dir / "y_labels.npy"))
+        logger.info("Loaded 2D data: X=%s  y=%s", X_2d.shape, y_1d.shape)
+
+        window_size = config.window_size
+        step_size = config.sequence.step_size
+        label_position = config.sequence.label_position
+        logger.info(
+            "Sliding window: size=%d  step=%d  label=%s",
+            window_size, step_size, label_position,
+        )
+
+        X_seq_3d, y_seq = build_sequences(
+            X_2d, y_1d,
+            window_size=window_size,
+            step_size=step_size,
+            label_position=label_position,
+        )
+        logger.info(
+            "Sequences built — X: %s  y: %s  (from %d samples → %d sequences)",
+            X_seq_3d.shape, y_seq.shape, X_2d.shape[0], X_seq_3d.shape[0],
+        )
+
+        # Overwrite with 3D sequences
+        np.save(str(preprocessed_dir / "X_sequences.npy"), X_seq_3d)
+        np.save(str(preprocessed_dir / "y_labels.npy"), y_seq)
+
+        # Update metadata with 3D shape info
+        import json as _json
+        meta_path = preprocessed_dir / "metadata.json"
+        if meta_path.exists():
+            with open(meta_path) as f:
+                meta = _json.load(f)
+            meta["sequence_length"] = window_size
+            meta["n_sequences"] = int(X_seq_3d.shape[0])
+            meta["sequence_shape_3d"] = list(X_seq_3d.shape)
+            with open(meta_path, "w") as f:
+                _json.dump(meta, f, indent=2)
+
+        # Update in-memory cache for downstream stages
+        n_classes = int(np.max(y_seq)) + 1
+        if meta_path.exists():
+            with open(meta_path) as f:
+                _meta_check = _json.load(f)
+            n_classes = _meta_check.get("n_classes", n_classes)
+        preprocessed_arrays = {
+            "X_seq": X_seq_3d,
+            "y_labels": y_seq,
+            "n_classes": n_classes,
+        }
+
+        del X_2d, y_1d
+        rm.stage_complete("sequence_build", metadata={
+            "n_sequences": int(X_seq_3d.shape[0]),
+            "window_size": window_size,
+        })
+        pm.end_stage("sequence_build")
+        gc.collect()
+        logger.info("Sequence build done.")
 
     # =================================================================
     # STAGE 3: Train/Val/Test split

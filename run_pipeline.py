@@ -583,7 +583,7 @@ def main() -> None:
                 X_seq,
                 y_labels,
                 preprocessed_dir,
-                seed=args.seed,
+                random_state=args.seed,
                 dataset=args.dataset,
             )
         )

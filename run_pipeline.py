@@ -687,36 +687,50 @@ def main() -> None:
             pm.start_stage("baselines")
             logger.info("━━━ Stage 5/9: Baseline models ━━━")
 
-            # Auto-sampling: cap at 200K rows for baselines (Req 5-6)
-            MAX_BASELINE_SAMPLES = 200_000
-            X_bl = X_train
-            y_bl = y_train
-            if X_train.shape[0] > MAX_BASELINE_SAMPLES:
-                rng = np.random.RandomState(args.seed)
-                idx = rng.choice(
-                    X_train.shape[0], MAX_BASELINE_SAMPLES, replace=False,
-                )
-                idx.sort()
-                X_bl = X_train[idx]
-                y_bl = y_train[idx]
-                logger.info(
-                    "Auto-sampled baselines: %s → %s rows",
-                    f"{X_train.shape[0]:,}", f"{MAX_BASELINE_SAMPLES:,}",
-                )
+            # Check if models already exist (resume after partial run)
+            existing_models = []
+            for name in ["random_forest", "svm", "logistic_regression"]:
+                if (baselines_dir / f"{name}.pkl").exists():
+                    existing_models.append(name)
 
-            fitted = train_all_baselines(X_bl, y_bl, config.raw.get("baselines", {}))
-            baselines_dir.mkdir(parents=True, exist_ok=True)
-            save_all_baselines(fitted, baselines_dir)
+            X_bl = None  # set below for metadata
 
-            # Evaluate each baseline
+            if len(existing_models) == 3:
+                logger.info("All 3 baseline models exist — skipping training.")
+                fitted = {n: load_baseline_model(n, baselines_dir) for n in existing_models}
+            else:
+                # Auto-sampling: cap at 200K rows for baselines (Req 5-6)
+                MAX_BASELINE_SAMPLES = 200_000
+                X_bl = X_train
+                y_bl = y_train
+                if X_train.shape[0] > MAX_BASELINE_SAMPLES:
+                    rng = np.random.RandomState(args.seed)
+                    idx = rng.choice(
+                        X_train.shape[0], MAX_BASELINE_SAMPLES, replace=False,
+                    )
+                    idx.sort()
+                    X_bl = X_train[idx]
+                    y_bl = y_train[idx]
+                    logger.info(
+                        "Auto-sampled baselines: %s → %s rows",
+                        f"{X_train.shape[0]:,}", f"{MAX_BASELINE_SAMPLES:,}",
+                    )
+
+                fitted = train_all_baselines(X_bl, y_bl, config.raw.get("baselines", {}))
+                baselines_dir.mkdir(parents=True, exist_ok=True)
+                save_all_baselines(fitted, baselines_dir)
+
+            # Evaluate each baseline on test set
             from src.utils.serialization import load_baseline_model
 
             # Load test data on-demand for baseline evaluation
+            logger.info("Loading test split for baseline evaluation ...")
             X_test, y_test = load_split_data_test(preprocessed_dir)
 
             results: Dict[str, Any] = {}
             for name in ["random_forest", "svm", "logistic_regression"]:
                 try:
+                    logger.info("Evaluating %s on test set (%s samples) ...", name, f"{X_test.shape[0]:,}")
                     model = load_baseline_model(name, baselines_dir)
                     y_pred, y_prob = predict_baseline(model, X_test, name)
                     metrics = compute_metrics(y_test, y_pred, y_prob, dataset=args.dataset, model_name=name)
@@ -739,7 +753,7 @@ def main() -> None:
                 _json.dump(results, f, indent=2)
 
             rm.stage_complete("baselines", metadata={
-                "training_samples": int(X_bl.shape[0]),
+                "training_samples": int(X_bl.shape[0]) if X_bl is not None else 200000,
                 "models": list(results.keys()),
             })
             # Free test data and baseline copies from memory

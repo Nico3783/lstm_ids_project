@@ -249,8 +249,6 @@ def _load_n_classes(preprocessed_dir: Path, dataset: str) -> int:
     # Fallback: count unique labels in y_labels.npy
     y_path = preprocessed_dir / "y_labels.npy"
     if y_path.exists():
-        import numpy as np
-
         y = np.load(y_path)
         return int(len(set(y.tolist())))
 
@@ -488,8 +486,6 @@ def main() -> None:
 
         # Sub-sample if requested
         if args.subsample is not None and 0 < args.subsample < 1.0:
-            import numpy as np
-
             n_total = X_seq.shape[0]
             n_keep = int(n_total * args.subsample)
             rng = np.random.RandomState(args.seed)
@@ -595,8 +591,6 @@ def main() -> None:
             logger.info("━━━ Stage 5/9: Baseline models ━━━")
 
             # Auto-sampling: cap at 200K rows for baselines (Req 5-6)
-            import numpy as np
-
             MAX_BASELINE_SAMPLES = 200_000
             X_bl = X_train
             y_bl = y_train

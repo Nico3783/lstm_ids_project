@@ -171,6 +171,13 @@ def parse_args() -> argparse.Namespace:
         help="Sub-sample the training data to this fraction (e.g. 0.3).",
     )
 
+    # Drive backup
+    p.add_argument(
+        "--zip-drive",
+        action="store_true",
+        help="After pipeline completes, zip outputs to Drive and free local disk.",
+    )
+
     # Training overrides
     p.add_argument("--epochs", type=int, default=None, help="Override max epochs.")
     p.add_argument("--batch-size", type=int, default=None, help="Override batch size.")
@@ -961,6 +968,37 @@ def main() -> None:
 
     # Print progress summary
     pm.print_summary()
+
+    # ── Zip outputs to Drive ──────────────────────────────────────
+    if args.zip_drive:
+        import shutil
+        import zipfile
+
+        drive_root = Path("/content/drive/MyDrive/lstm_ids_results")
+        drive_root.mkdir(parents=True, exist_ok=True)
+        zip_path = drive_root / f"{args.dataset}.zip"
+        src_dir = dirs["root"]
+
+        logger.info("Zipping outputs to: %s", zip_path)
+        logger.info("Source: %s", src_dir)
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            file_count = 0
+            for fpath in sorted(src_dir.rglob("*")):
+                if fpath.is_file():
+                    arcname = fpath.relative_to(src_dir.parent)
+                    zf.write(fpath, arcname)
+                    file_count += 1
+                    if file_count % 50 == 0:
+                        logger.info("  zipped %d files ...", file_count)
+
+        zip_size_gb = zip_path.stat().st_size / (1024 ** 3)
+        logger.info("ZIP saved: %s (%.2f GB, %d files)", zip_path, zip_size_gb, file_count)
+
+        # Free local disk
+        shutil.rmtree(src_dir)
+        logger.info("Local output removed: %s", src_dir)
+        gc.collect()
 
 
 # ─── Entry point ───────────────────────────────────────────────────────

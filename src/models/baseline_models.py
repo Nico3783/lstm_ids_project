@@ -277,9 +277,12 @@ def train_all_baselines(
         )
         n_samples = MAX_BASELINE_SAMPLES
 
-    rf_cfg  = cfg.get("random_forest",       {})
-    svm_cfg = cfg.get("svm",                 {})
-    lr_cfg  = cfg.get("logistic_regression", {})
+    def _strip_enabled(d):
+        return {k: v for k, v in d.items() if k != "enabled"}
+
+    rf_cfg  = _strip_enabled(cfg.get("random_forest",       {}))
+    svm_cfg = _strip_enabled(cfg.get("svm",                 {}))
+    lr_cfg  = _strip_enabled(cfg.get("logistic_regression", {}))
 
     models = {
         "random_forest":       build_random_forest(**rf_cfg),

@@ -695,6 +695,8 @@ def main() -> None:
             logger.info("━━━ Stage 5/9: Baseline models ━━━")
 
             # Check if models already exist (resume after partial run)
+            from src.utils.serialization import load_baseline_model
+
             existing_models = []
             for name in ["random_forest", "svm", "logistic_regression"]:
                 if (baselines_dir / f"{name}.pkl").exists():
@@ -728,8 +730,6 @@ def main() -> None:
                 save_all_baselines(fitted, baselines_dir)
 
             # Evaluate each baseline on test set
-            from src.utils.serialization import load_baseline_model
-
             # Load test data on-demand for baseline evaluation
             logger.info("Loading test split for baseline evaluation ...")
             X_test, y_test = load_split_data_test(preprocessed_dir)

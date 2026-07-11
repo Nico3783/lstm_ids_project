@@ -658,20 +658,25 @@ def main() -> None:
         logger.info("Data split done.")
 
     # =================================================================
-    # Load split data lazily — only what's needed per stage
+    # Load split data lazily — only if we need training or later stages
     # =================================================================
-    # Training stages only need X_train, y_train, X_val, y_val, scaler, label_enc
-    # Test data (X_test, y_test) is loaded on-demand for evaluation.
-    logger.info("Loading split arrays from: %s", preprocessed_dir)
-    X_train, X_val, y_train, y_val, scaler, label_enc = (
-        load_split_data_train(preprocessed_dir)
-    )
+    stages_needing_splits = {"tuning", "baselines", "lstm_train", "evaluation", "visualization", "export"}
+    needs_splits = stages_needing_splits & set(stages_to_run)
 
+    X_train = X_val = y_train = y_val = scaler = label_enc = None
     n_classes = _load_n_classes(preprocessed_dir, args.dataset)
-    logger.info(
-        "Loaded — train: %s, val: %s, n_classes: %d",
-        X_train.shape, X_val.shape, n_classes,
-    )
+
+    if needs_splits:
+        logger.info("Loading split arrays from: %s", preprocessed_dir)
+        X_train, X_val, y_train, y_val, scaler, label_enc = (
+            load_split_data_train(preprocessed_dir)
+        )
+        logger.info(
+            "Loaded — train: %s, val: %s, n_classes: %d",
+            X_train.shape, X_val.shape, n_classes,
+        )
+    else:
+        logger.info("Skipping split data load (no training stages requested). n_classes=%d", n_classes)
 
     # =================================================================
     # STAGE 4: Hyperparameter tuning (optional)

@@ -147,10 +147,23 @@ def train_lstm(
     checkpoint_loaded = False
     
     if resume:
-        ckpt_path = Path(config.training.model_checkpoint.filepath)
-        if not ckpt_path.is_absolute():
-            from src.utils.paths import PROJECT_ROOT
-            ckpt_path = PROJECT_ROOT / ckpt_path
+        # Resolve checkpoint path against checkpoint_dir (dataset output root),
+        # NOT against PROJECT_ROOT.  The callback writes to
+        # <checkpoint_dir>/models/checkpoints/best_model.keras.
+        _ckpt_fname = Path(config.training.model_checkpoint.filepath).name
+        _base = Path(checkpoint_dir) if checkpoint_dir else (Path(save_dir) if save_dir else Path("."))
+        ckpt_path = _base / "models" / "checkpoints" / _ckpt_fname
+        # Also check alternate extension (.h5) if .keras not found
+        if not ckpt_path.exists():
+            alt = ckpt_path.with_suffix(".h5")
+            if alt.exists():
+                ckpt_path = alt
+        # Also check periodic checkpoint as fallback
+        if not ckpt_path.exists():
+            periodic = _base / "models" / "checkpoints" / "periodic.keras"
+            if periodic.exists():
+                ckpt_path = periodic
+                logger.info("Using periodic checkpoint as fallback: %s", ckpt_path)
 
         if ckpt_path.exists():
             logger.info("Checkpoint found at %s. Attempting to resume training...", ckpt_path)
@@ -160,10 +173,8 @@ def train_lstm(
                 checkpoint_loaded = True
 
                 # Determine initial epoch from history CSV
-                csv_path = Path(config.training.csv_logger_filepath)
-                if not csv_path.is_absolute():
-                    from src.utils.paths import PROJECT_ROOT
-                    csv_path = PROJECT_ROOT / csv_path
+                _csv_fname = Path(config.training.csv_logger_filepath).name
+                csv_path = _base / "reports" / "logs" / _csv_fname
 
                 if csv_path.exists() and csv_path.stat().st_size > 0:
                     with open(csv_path, "r", encoding="utf-8") as f:

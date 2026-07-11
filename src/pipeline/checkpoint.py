@@ -175,7 +175,6 @@ class CheckpointManager:
             ],
             "lstm_train": [
                 "models/final/lstm_ids_model.keras",
-                "models/final/lstm_ids_model.h5",
                 "models/final/model_metadata.json",
             ],
             "evaluation": [

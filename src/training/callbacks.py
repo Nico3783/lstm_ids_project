@@ -104,6 +104,38 @@ class EpochProgressLogger(tf.keras.callbacks.Callback):
         )
 
 
+class PeriodicCheckpoint(tf.keras.callbacks.Callback):
+    """
+    Saves the full Keras model every ``save_every`` epochs to a
+    fixed path (overwrites).  This guarantees a resumable
+    checkpoint exists even if the model never improves, and
+    survives Colab session kills that happen between epochs.
+
+    The file is always written to ``<output_dir>/models/checkpoints/periodic.keras``.
+    ``ModelCheckpoint`` (save_best_only) writes to ``best_model.keras`` —
+    the two never collide.
+    """
+
+    def __init__(
+        self,
+        output_dir: Path,
+        save_every: int = 5,
+    ) -> None:
+        super().__init__()
+        self.output_dir = Path(output_dir)
+        self.save_every = save_every
+        self._path = self.output_dir / "models" / "checkpoints" / "periodic.keras"
+        ensure_dir(self._path)
+
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
+        if (epoch + 1) % self.save_every == 0:
+            self.model.save(str(self._path), overwrite=True)
+            logger.info(
+                "Periodic checkpoint saved (epoch %d) → %s",
+                epoch + 1, self._path,
+            )
+
+
 # Callback Builder
 def build_callbacks(
     checkpoint_path: Optional[Path] = None,
@@ -119,6 +151,8 @@ def build_callbacks(
     enable_tensorboard: bool = True,
     enable_csv_logger: bool = True,
     enable_epoch_logger: bool = True,
+    enable_periodic_checkpoint: bool = True,
+    periodic_checkpoint_every: int = 5,
     resume: bool = False,
 ) -> List[Any]:
     """
@@ -276,6 +310,19 @@ def build_callbacks(
         callbacks.append(EpochProgressLogger())
         logger.info("EpochProgressLogger attached.")
 
+    # 7. Periodic Checkpoint (every N epochs regardless of val_loss)
+    if enable_periodic_checkpoint and checkpoint_path is not None:
+        _pc_out = checkpoint_path.parent.parent  # models/checkpoints/ → models/ → root
+        callbacks.append(PeriodicCheckpoint(
+            output_dir=_pc_out,
+            save_every=periodic_checkpoint_every,
+        ))
+        logger.info(
+            "PeriodicCheckpoint — every %d epochs → %s.",
+            periodic_checkpoint_every,
+            _pc_out / "models" / "checkpoints" / "periodic.keras",
+        )
+
     logger.info(
         "Callbacks built — %d total: %s.",
         len(callbacks),
@@ -347,5 +394,7 @@ def build_callbacks_from_config(
         enable_tensorboard=True,
         enable_csv_logger=True,
         enable_epoch_logger=True,
+        enable_periodic_checkpoint=True,
+        periodic_checkpoint_every=5,
         resume=resume,
     )

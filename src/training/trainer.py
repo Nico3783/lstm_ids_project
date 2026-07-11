@@ -467,6 +467,7 @@ def run_full_training(
 
     # Resolve dataset-specific output paths
     if output_dir is not None:
+        output_dir = Path(output_dir)
         baselines_out = output_dir / "models" / "baselines"
         final_out = output_dir / "models" / "final"
         ckpts_out = output_dir / "models" / "checkpoints"

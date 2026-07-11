@@ -444,6 +444,21 @@ def main() -> None:
         df_raw, df_test_unused = load_dataset(args.dataset)
         logger.info("Raw shape: %s", df_raw.shape)
 
+        # Sub-sample early to avoid OOM during sequence building
+        if args.subsample is not None and 0 < args.subsample < 1.0:
+            n_total = len(df_raw)
+            n_keep = int(n_total * args.subsample)
+            rng = np.random.RandomState(args.seed)
+            indices = rng.choice(n_total, size=n_keep, replace=False)
+            indices.sort()
+            df_raw = df_raw.iloc[indices].reset_index(drop=True)
+            logger.info(
+                "Sub-sampled raw DataFrame %s → %s rows (%.1f%%)",
+                f"{n_total:,}", f"{n_keep:,}", args.subsample * 100,
+            )
+            del indices
+            gc.collect()
+
         X_seq, y_labels, scaler, feature_names, metadata = preprocess_dataset(
             df_raw, dataset=args.dataset
         )
@@ -580,29 +595,6 @@ def main() -> None:
         # to avoid loading the 7.5 GB array into RAM
         y_labels = np.load(str(preprocessed_dir / "y_labels.npy"))
         x_npy_path = str(preprocessed_dir / "X_sequences.npy")
-
-        # Sub-sample if requested
-        if args.subsample is not None and 0 < args.subsample < 1.0:
-            X_seq = np.load(x_npy_path)
-            n_total = X_seq.shape[0]
-            n_keep = int(n_total * args.subsample)
-            rng = np.random.RandomState(args.seed)
-            indices = rng.choice(n_total, size=n_keep, replace=False)
-            indices.sort()
-            X_seq = X_seq[indices]
-            y_labels = y_labels[indices]
-            logger.info(
-                "Sub-sampled %s → %s rows (%.1f%%)",
-                f"{n_total:,}", f"{n_keep:,}", args.subsample * 100,
-            )
-            # Save sub-sampled X to temp and pass path
-            import tempfile
-            with tempfile.NamedTemporaryFile(suffix=".npy", delete=False) as tmp:
-                tmp_path = tmp.name
-            np.save(tmp_path, X_seq)
-            del X_seq
-            gc.collect()
-            x_npy_path = tmp_path
 
         # Split — pass x_path to skip loading into RAM
         X_train, X_val, X_test, y_train, y_val, y_test = (

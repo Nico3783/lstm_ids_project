@@ -32,6 +32,7 @@ def get_class_weights(
     y_train: np.ndarray,
     class_names: Optional[List[str]] = None,
     strategy: str = "inverse_frequency",
+    max_weight: Optional[float] = None,
 ) -> Dict[int, float]:
     """
     Compute class weights for training.
@@ -46,6 +47,13 @@ def get_class_weights(
         ``"inverse_frequency"`` — weight_c = n / (k × n_c)
         ``"uniform"``           — all weights = 1.0
         ``"sqrt"``              — weight_c = sqrt(n / n_c)
+    max_weight : float, optional
+        Hard cap on any single class weight.  When the raw
+        inverse-frequency weight exceeds this value it is
+        clamped.  Prevents ultra-rare classes (e.g. 2 samples
+        in 787K) from destroying gradient flow.  Default when
+        None: ``sqrt(n_samples)`` which scales with dataset
+        size.
 
     Returns
     -------
@@ -57,18 +65,23 @@ def get_class_weights(
     n_samples = len(y_train)
     n_classes  = len(unique)
 
+    # Default cap: sqrt(n_samples) — grows with data size but
+    # prevents astronomically large weights for rare classes.
+    if max_weight is None:
+        max_weight = float(np.sqrt(n_samples))
+
     if strategy == "uniform":
         weights = {int(c): 1.0 for c in unique}
 
     elif strategy == "sqrt":
         weights = {}
         for cls, cnt in zip(unique, counts):
-            weights[int(cls)] = float(
-                np.sqrt(n_samples / (n_classes * cnt))
-            )
+            w = float(np.sqrt(n_samples / (n_classes * cnt)))
+            weights[int(cls)] = min(w, max_weight)
 
     else:   # inverse_frequency (default, matches Chapter 3)
-        weights = compute_class_weights(y_train)
+        raw = compute_class_weights(y_train)
+        weights = {cls: min(w, max_weight) for cls, w in raw.items()}
 
     # Log with class names
     names = class_names or (
@@ -77,7 +90,8 @@ def get_class_weights(
         else None
     )
     logger.info(
-        "Class weights (strategy='%s'):", strategy
+        "Class weights (strategy='%s', max_weight=%.1f):",
+        strategy, max_weight,
     )
     for cls_int, wt in sorted(weights.items()):
         name = (

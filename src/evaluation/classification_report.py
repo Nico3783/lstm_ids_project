@@ -77,7 +77,7 @@ def generate_classification_report(
     full_text = header + report_str
 
     # ---- Save text ----
-    out_dir = output_dir or METRICS_DIR
+    out_dir = Path(output_dir) if output_dir else METRICS_DIR
     ensure_dir(out_dir / "placeholder")
     txt_path = out_dir / "classification_report.txt"
     txt_path.write_text(full_text, encoding="utf-8")
@@ -122,7 +122,7 @@ def generate_classification_report(
                     "Support": "",
                 })
 
-    csv_out = output_dir or TABLES_DIR
+    csv_out = Path(output_dir) if output_dir else TABLES_DIR
     ensure_dir(csv_out / "placeholder")
     csv_path = csv_out / "final_metrics.csv"
     pd.DataFrame(rows).to_csv(csv_path, index=False)

@@ -860,7 +860,7 @@ def main() -> None:
         # Confusion matrix
         plot_confusion_matrix(
             y_test, y_pred, dataset=args.dataset,
-            output_path=str(tables_dir),
+            output_path=tables_dir / "confusion_matrix.png",
         )
 
         # Per-class metrics (via compute_metrics)

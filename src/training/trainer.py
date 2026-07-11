@@ -238,10 +238,16 @@ def train_lstm(
     import csv
     full_history = {"loss": [], "accuracy": [], "val_loss": [], "val_accuracy": []}
     try:
-        csv_path = Path(config.training.csv_logger_filepath)
-        if not csv_path.is_absolute():
-            from src.utils.paths import PROJECT_ROOT
-            csv_path = PROJECT_ROOT / csv_path
+        csv_path = None
+        if checkpoint_dir is not None:
+            candidate = Path(checkpoint_dir) / "reports" / "logs" / "training_history.csv"
+            if candidate.exists():
+                csv_path = candidate
+        if csv_path is None:
+            csv_path = Path(config.training.csv_logger_filepath)
+            if not csv_path.is_absolute():
+                from src.utils.paths import PROJECT_ROOT
+                csv_path = PROJECT_ROOT / csv_path
         
         if csv_path.exists():
             with open(csv_path, mode="r", encoding="utf-8") as f:
@@ -470,11 +476,9 @@ def run_full_training(
         output_dir = Path(output_dir)
         baselines_out = output_dir / "models" / "baselines"
         final_out = output_dir / "models" / "final"
-        ckpts_out = output_dir / "models" / "checkpoints"
     else:
         baselines_out = None
         final_out = None
-        ckpts_out = None
 
     results: Dict[str, TrainingResult] = {}
 
@@ -547,7 +551,7 @@ def run_full_training(
         save_dir=final_out,
         dataset=dataset,
         resume=resume,
-        checkpoint_dir=ckpts_out,
+        checkpoint_dir=output_dir,
     )
     results["lstm"] = lstm_result
 

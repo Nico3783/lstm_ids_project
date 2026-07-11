@@ -812,7 +812,7 @@ def main() -> None:
             n_classes=n_classes,
             dataset=args.dataset,
             config=config,
-            output_dir=str(final_dir),
+            output_dir=str(dirs["root"]),
             resume=args.resume,
         )
 
@@ -837,8 +837,8 @@ def main() -> None:
         # Load trained LSTM
         from src.utils.serialization import load_keras_model as load_trained_model
 
-        keras_path = final_dir / "lstm_model.keras"
-        h5_path = final_dir / "lstm_model.h5"
+        keras_path = final_dir / "lstm_ids_model.keras"
+        h5_path = final_dir / "lstm_ids_model.h5"
         if keras_path.exists():
             lstm_model = load_trained_model(str(keras_path))
         elif h5_path.exists():
@@ -889,7 +889,9 @@ def main() -> None:
         figures_dir.mkdir(parents=True, exist_ok=True)
 
         # --- 8a. Training history curves ---
-        history_csv = final_dir / "training_history.csv"
+        history_csv = dirs["root"] / "reports" / "logs" / "training_history.csv"
+        if not history_csv.exists():
+            history_csv = final_dir / "training_history.csv"
         if history_csv.exists():
             import csv as _csv
 
@@ -916,8 +918,8 @@ def main() -> None:
 
         X_test_viz, y_test_viz = load_split_data_test(preprocessed_dir)
 
-        keras_path = final_dir / "lstm_model.keras"
-        h5_path = final_dir / "lstm_model.h5"
+        keras_path = final_dir / "lstm_ids_model.keras"
+        h5_path = final_dir / "lstm_ids_model.h5"
         lstm_model = None
         if keras_path.exists():
             lstm_model = load_trained_model(str(keras_path))
@@ -958,7 +960,7 @@ def main() -> None:
         # Copy final model
         import shutil
 
-        for fname in ["lstm_model.keras", "lstm_model.h5"]:
+        for fname in ["lstm_ids_model.keras", "lstm_ids_model.h5"]:
             src = final_dir / fname
             dst = exported_dir / fname
             if src.exists():

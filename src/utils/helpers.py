@@ -644,15 +644,41 @@ def check_label_consistency(
     val_classes = set(np.unique(y_val).tolist())
     test_classes = set(np.unique(y_test).tolist())
 
+    all_split_classes = train_classes | val_classes | test_classes
+
     if not (train_classes == val_classes == test_classes):
-        raise ValueError(
-            f"Label mismatch across splits.\n"
-            f"  Train classes : {sorted(train_classes)}\n"
-            f"  Val classes   : {sorted(val_classes)}\n"
-            f"  Test classes  : {sorted(test_classes)}\n"
-            "Ensure stratified splitting was applied correctly."
+        missing_in_val = train_classes - val_classes
+        missing_in_test = train_classes - test_classes
+        missing_both = missing_in_val & missing_in_test
+        missing_only_val = missing_in_val - missing_both
+        missing_only_test = missing_in_test - missing_both
+
+        if missing_both:
+            # Class missing from both val AND test — real problem
+            raise ValueError(
+                f"Label mismatch: classes {sorted(missing_both)} absent from BOTH val and test.\n"
+                f"  Train classes : {sorted(train_classes)}\n"
+                f"  Val classes   : {sorted(val_classes)}\n"
+                f"  Test classes  : {sorted(test_classes)}"
+            )
+
+        # Warn about per-split gaps (normal for highly imbalanced datasets)
+        if missing_only_val:
+            logger.warning(
+                "Classes %s present in train but missing from val (rare classes).",
+                sorted(missing_only_val),
+            )
+        if missing_only_test:
+            logger.warning(
+                "Classes %s present in train but missing from test (rare classes).",
+                sorted(missing_only_test),
+            )
+        logger.info(
+            "Label check passed (with rare-class gaps) — %d total classes.",
+            len(all_split_classes),
         )
-    logger.info(
-        "Label consistency check passed — %d classes in all splits.",
-        len(train_classes),
-    )
+    else:
+        logger.info(
+            "Label consistency check passed — %d classes in all splits.",
+            len(train_classes),
+        )

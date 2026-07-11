@@ -171,6 +171,27 @@ def parse_args() -> argparse.Namespace:
         help="Sub-sample the training data to this fraction (e.g. 0.3).",
     )
 
+    # Stage range control (for per-cell Colab execution)
+    STAGE_LIST = [
+        "preprocessing", "sequence_build", "split_save",
+        "tuning", "baselines", "lstm_train",
+        "evaluation", "visualization", "export",
+    ]
+    p.add_argument(
+        "--start-stage",
+        type=str,
+        default=None,
+        choices=STAGE_LIST,
+        help="Start pipeline from this stage (skip earlier stages).",
+    )
+    p.add_argument(
+        "--end-stage",
+        type=str,
+        default=None,
+        choices=STAGE_LIST,
+        help="Stop pipeline after this stage (inclusive).",
+    )
+
     # Drive backup
     p.add_argument(
         "--zip-drive",
@@ -401,6 +422,16 @@ def main() -> None:
 
     # Determine which stages to run
     stages_to_run = plan["to_run"] if plan else list(CheckpointManager.STAGES)
+
+    # Apply --start-stage / --end-stage filters
+    if args.start_stage is not None:
+        start_idx = CheckpointManager.STAGES.index(args.start_stage)
+        stages_to_run = [s for s in stages_to_run if CheckpointManager.STAGES.index(s) >= start_idx]
+        logger.info("Starting from stage: %s (index %d)", args.start_stage, start_idx)
+    if args.end_stage is not None:
+        end_idx = CheckpointManager.STAGES.index(args.end_stage)
+        stages_to_run = [s for s in stages_to_run if CheckpointManager.STAGES.index(s) <= end_idx]
+        logger.info("Stopping at stage: %s (index %d)", args.end_stage, end_idx)
 
     # ── Determine if we need to load preprocessed data ──────────────
     # When resuming, some stages may be skipped but later stages need

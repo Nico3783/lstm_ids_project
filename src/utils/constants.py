@@ -179,6 +179,26 @@ CICIDS2017_ATTACK_CATEGORIES: List[str] = [
     "Heartbleed",
 ]
 
+# Human-readable class names in integer-mapping order
+# (BENIGN=0, then alphabetical — matches map_cicids2017_labels)
+CICIDS2017_CLASS_NAMES: List[str] = [
+    "BENIGN",                      # 0
+    "Bot",                         # 1
+    "DDoS",                        # 2
+    "DoS GoldenEye",               # 3
+    "DoS Hulk",                    # 4
+    "DoS Slowhttptest",            # 5
+    "DoS slowloris",               # 6
+    "FTP-Patator",                 # 7
+    "Heartbleed",                  # 8
+    "Infiltration",                # 9
+    "PortScan",                    # 10
+    "SSH-Patator",                 # 11
+    "Web Attack – Brute Force",    # 12
+    "Web Attack – Sql Injection",  # 13
+    "Web Attack – XSS",            # 14
+]
+
 # Columns with known infinite/NaN issues in CICIDS2017
 CICIDS2017_PROBLEMATIC_COLUMNS: List[str] = [
     "Flow Bytes/s",

@@ -190,6 +190,8 @@ def build_lstm_model(
     # ---- Compile ----
     optimizer = tf.keras.optimizers.Adam(
         learning_rate=learning_rate,
+        clipnorm=1.0,   # Prevent exploding gradients with
+                         # extreme class weights
         name="adam",
     )
     model.compile(

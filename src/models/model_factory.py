@@ -115,23 +115,51 @@ def _create_lstm(
     from src.models.lstm_model import build_lstm_model
 
     m = config.model
-    lstm_units = kwargs.pop(
-        "lstm_units",
-        [layer.units for layer in m.lstm_layers],
-    )
+
+    # Check for dataset-specific model overrides
+    ds = config.active_dataset
+    overrides = m.model_overrides.get(ds, {}) if m.model_overrides else {}
+
+    # Merge: kwargs > overrides > base config
+    if "lstm_layers" in overrides:
+        o_layers = overrides["lstm_layers"]
+        lstm_units = kwargs.pop(
+            "lstm_units",
+            [layer["units"] if isinstance(layer, dict) else layer.units
+             for layer in o_layers],
+        )
+        # Use first override layer's dropout
+        _o0 = o_layers[0]
+        _o_drop = _o0["dropout"] if isinstance(_o0, dict) else _o0.dropout
+    else:
+        lstm_units = kwargs.pop(
+            "lstm_units",
+            [layer.units for layer in m.lstm_layers],
+        )
+        _o_drop = m.lstm_layers[0].dropout
+
+    if "dense_layers" in overrides:
+        _d0 = overrides["dense_layers"][0]
+        _o_dense = _d0["units"] if isinstance(_d0, dict) else _d0.units
+        _o_l2 = (
+            _d0.get("l2_regularization", 0.001)
+            if isinstance(_d0, dict)
+            else _d0.l2_regularization
+        )
+    else:
+        _o_dense = m.dense_layers[0].units if m.dense_layers else 32
+        _o_l2 = (
+            m.dense_layers[0].l2_regularization
+            if m.dense_layers else 0.001
+        )
+
     return build_lstm_model(
         input_shape=input_shape,
         n_classes=n_classes,
         lstm_units=lstm_units,
-        dropout_rate=kwargs.pop("dropout_rate", m.lstm_layers[0].dropout),
-        dense_units=kwargs.pop(
-            "dense_units",
-            m.dense_layers[0].units if m.dense_layers else 32,
-        ),
-        l2_lambda=kwargs.pop(
-            "l2_lambda",
-            m.dense_layers[0].l2_regularization if m.dense_layers else 0.001,
-        ),
+        dropout_rate=kwargs.pop("dropout_rate", _o_drop),
+        dense_units=kwargs.pop("dense_units", _o_dense),
+        l2_lambda=kwargs.pop("l2_lambda", _o_l2),
         learning_rate=kwargs.pop("learning_rate", m.learning_rate),
         **kwargs,
     )

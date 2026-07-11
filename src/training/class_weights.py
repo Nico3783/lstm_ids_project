@@ -65,10 +65,13 @@ def get_class_weights(
     n_samples = len(y_train)
     n_classes  = len(unique)
 
-    # Default cap: sqrt(n_samples) — grows with data size but
-    # prevents astronomically large weights for rare classes.
+    # Default cap: min(20, sqrt(n_samples))
+    # A cap of 20 prevents rare classes from destroying gradient
+    # flow. Literature recommends caps of 10-20 for extreme
+    # imbalance. sqrt(n_samples) grows with dataset size and
+    # becomes catastrophic for large datasets like CICIDS2017.
     if max_weight is None:
-        max_weight = float(np.sqrt(n_samples))
+        max_weight = float(min(20.0, np.sqrt(n_samples)))
 
     if strategy == "uniform":
         weights = {int(c): 1.0 for c in unique}

@@ -139,6 +139,18 @@ def handle_missing_and_infinite(
             "Replaced %d infinite values with NaN.", n_inf
         )
 
+    # Drop rows where ALL feature columns are NaN
+    # (corrupted rows that would become zeros after imputation)
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    if numeric_cols:
+        all_nan_mask = df[numeric_cols].isnull().all(axis=1)
+        n_all_nan = int(all_nan_mask.sum())
+        if n_all_nan > 0:
+            df = df[~all_nan_mask].reset_index(drop=True)
+            logger.info(
+                "Dropped %d rows with all-NaN features.", n_all_nan
+            )
+
     n_missing_before = int(df.isnull().sum().sum())
     if n_missing_before == 0:
         logger.info("No missing values — imputation skipped.")
@@ -160,7 +172,7 @@ def handle_missing_and_infinite(
                 fill_val = df[col].median()
             else:
                 fill_val = df[col].mean()
-            df[col].fillna(fill_val, inplace=True)
+            df[col] = df[col].fillna(fill_val)
 
     # Categorical / object columns
     cat_cols = df.select_dtypes(
@@ -170,7 +182,7 @@ def handle_missing_and_infinite(
         if df[col].isnull().any():
             fill_val = df[col].mode()
             fill_val = fill_val.iloc[0] if len(fill_val) > 0 else "unknown"
-            df[col].fillna(fill_val, inplace=True)
+            df[col] = df[col].fillna(fill_val)
 
     n_missing_after = int(df.isnull().sum().sum())
     logger.info(
@@ -728,6 +740,16 @@ def preprocess_dataset(
         dataset=dataset,
     )
 
+    # Step 2b — Log-scale flow-rate features (CICIDS2017)
+    # These features span many orders of magnitude (0 to millions).
+    # Without log-scaling, MinMax compresses all values near 0.
+    if dataset == "cicids2017":
+        log_cols = ["Flow Bytes/s", "Flow Packets/s"]
+        for col in log_cols:
+            if col in df.columns:
+                df[col] = np.log1p(df[col].clip(lower=0))
+                logger.info("Applied log1p to '%s'.", col)
+
     # Step 4 — Remove duplicates
     df = remove_duplicates(df)
 
@@ -768,15 +790,30 @@ def preprocess_dataset(
 
     # Metadata snapshot
     n_classes = int(np.max(y_array)) + 1
+
+    # Build human-readable class names
+    if dataset == "nsl_kdd":
+        class_names = NSL_KDD_CLASS_NAMES
+    elif dataset == "cicids2017":
+        # Recover the original category names from the mapping
+        target = CICIDS2017_TARGET_COLUMN.strip()
+        # The label column was mapped, but we can reconstruct
+        # from the sorted unique values before mapping
+        # Use a known ordering: BENIGN first, then alphabetical
+        # (matches map_cicids2017_labels logic)
+        # Since labels are already integers, use the mapping
+        # saved during label mapping
+        from src.utils.constants import CICIDS2017_CLASS_NAMES
+        class_names = CICIDS2017_CLASS_NAMES
+    else:
+        class_names = [str(i) for i in range(n_classes)]
+
     metadata = {
         "dataset": dataset,
         "n_samples": int(len(X_scaled)),
         "n_features": int(len(feature_names)),
         "n_classes": n_classes,
-        "class_names": (
-            NSL_KDD_CLASS_NAMES if dataset == "nsl_kdd"
-            else [str(i) for i in range(n_classes)]
-        ),
+        "class_names": class_names,
         "feature_range": list(feature_range),
         "missing_strategy_continuous": strategy_continuous,
         "missing_strategy_categorical": strategy_categorical,

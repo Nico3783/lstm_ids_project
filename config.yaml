@@ -170,6 +170,26 @@ model:
   # Compilation settings (Chapter 3, Section 3.5.3)
   optimizer: "adam"
   learning_rate: 0.001              # Initial LR per Chapter 3
+  # Dataset-specific model overrides
+  # When active, these override the base architecture above.
+  model_overrides:
+    cicids2017:
+      lstm_layers:
+        - units: 256
+          return_sequences: true
+          dropout: 0.2
+          activation: "tanh"
+          recurrent_activation: "sigmoid"
+        - units: 128
+          return_sequences: false
+          dropout: 0.2
+          activation: "tanh"
+          recurrent_activation: "sigmoid"
+      dense_layers:
+        - units: 64
+          activation: "relu"
+          l2_regularization: 0.001
+          batch_normalization: true
   loss: "categorical_crossentropy"
   metrics:
     - "accuracy"
@@ -185,9 +205,11 @@ training:
   early_stopping:
     enabled: true
     monitor: "val_loss"
-    patience: 10                  # Chapter 3: patience=10
+    patience: 20                 # Increased from 10 — allows more
+                                 # learning time for imbalanced data
     restore_best_weights: true
-    min_delta: 0.0001
+    min_delta: 0.00001           # Reduced from 0.0001 — allows
+                                 # smaller improvements to count
   model_checkpoint:
     enabled: true
     monitor: "val_loss"
@@ -197,7 +219,8 @@ training:
     enabled: true
     monitor: "val_loss"
     factor: 0.5
-    patience: 5
+    patience: 8                  # Increased from 5 — wait longer
+                                 # before reducing LR
     min_lr: 0.000001
   tensorboard:
     enabled: true

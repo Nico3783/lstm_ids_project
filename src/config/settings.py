@@ -96,6 +96,11 @@ class ModelConfig:
     metrics: List[str] = field(
         default_factory=lambda: ["accuracy", "Precision", "Recall"]
     )
+    # Dataset-specific model overrides — when present for the
+    # active dataset, these override the base architecture.
+    # Example: model_overrides.cicids2017.lstm_layers → replaces
+    # the default lstm_layers when active_dataset == "cicids2017".
+    model_overrides: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

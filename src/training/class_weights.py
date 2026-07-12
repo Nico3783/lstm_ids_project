@@ -65,13 +65,14 @@ def get_class_weights(
     n_samples = len(y_train)
     n_classes  = len(unique)
 
-    # Default cap: min(20, sqrt(n_samples))
-    # A cap of 20 prevents rare classes from destroying gradient
-    # flow. Literature recommends caps of 10-20 for extreme
-    # imbalance. sqrt(n_samples) grows with dataset size and
-    # becomes catastrophic for large datasets like CICIDS2017.
+    # Default cap: min(100, sqrt(n_samples))
+    # A cap of 100 allows minority classes to contribute meaningful
+    # gradient signal. The old cap of 20 compressed weights by 918x
+    # for rare classes, destroying the model's ability to learn
+    # minority attack categories. sqrt(n_samples) grows with dataset
+    # size and provides a natural upper bound.
     if max_weight is None:
-        max_weight = float(min(20.0, np.sqrt(n_samples)))
+        max_weight = float(min(100.0, np.sqrt(n_samples)))
 
     if strategy == "uniform":
         weights = {int(c): 1.0 for c in unique}

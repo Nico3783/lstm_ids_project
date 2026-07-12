@@ -133,7 +133,7 @@ preprocessing:
 # Window size 10 selected from hyperparameter search
 sequence:
   window_size: 10          # Sliding window of 10 consecutive records
-  step_size: 1             # Slide by 1 at each step (overlapping windows)
+  step_size: 10            # Slide by window_size to avoid 90% overlap
   label_position: "last"   # Label = class of the final timestep in window
 
 # Data Split Configuration

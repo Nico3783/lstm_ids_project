@@ -687,8 +687,10 @@ def main() -> None:
     # run, prepend them automatically instead of crashing.
     needs_splits = stages_needing_splits & set(stages_to_run)
     if needs_splits:
-        preproc_marker = preprocessed_dir / ".checkpoints" / "preprocessing.done"
-        seq_marker = preprocessed_dir / ".checkpoints" / "sequence_build.done"
+        # Checkpoint markers are stored in the dataset root, not preprocessed dir
+        root_done_dir = dirs["root"] / ".checkpoints"
+        preproc_marker = root_done_dir / "preprocessing.done"
+        seq_marker = root_done_dir / "sequence_build.done"
         x_train_exists = (preprocessed_dir / "X_train.npy").exists()
 
         missing = []

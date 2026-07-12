@@ -658,18 +658,35 @@ def main() -> None:
         logger.info("Data split done.")
 
     # =================================================================
-    # Load split data lazily — only if we need training or later stages
+    # Load split data lazily — only when a stage that needs it starts
     # =================================================================
     stages_needing_splits = {"tuning", "baselines", "lstm_train", "evaluation", "visualization", "export"}
-    needs_splits = stages_needing_splits & set(stages_to_run)
 
     X_train = X_val = y_train = y_val = scaler = label_enc = None
+    n_classes = None
+    splits_loaded = False
+
+    def _ensure_splits_loaded():
+        """Load split arrays on first demand (after prepended stages have run)."""
+        nonlocal X_train, X_val, y_train, y_val, scaler, label_enc, n_classes, splits_loaded
+        if splits_loaded:
+            return
+        logger.info("Loading split arrays from: %s", preprocessed_dir)
+        X_train, X_val, y_train, y_val, scaler, label_enc = (
+            load_split_data_train(preprocessed_dir)
+        )
+        n_classes = _load_n_classes(preprocessed_dir, args.dataset)
+        splits_loaded = True
+        logger.info(
+            "Loaded — train: %s, val: %s, n_classes: %d",
+            X_train.shape, X_val.shape, n_classes,
+        )
 
     # Auto-detect missing prerequisites: if user starts mid-pipeline
     # (e.g. --start-stage lstm_train) but earlier stages haven't been
     # run, prepend them automatically instead of crashing.
+    needs_splits = stages_needing_splits & set(stages_to_run)
     if needs_splits:
-        split_marker = preprocessed_dir / ".checkpoints" / "split_save.done"
         preproc_marker = preprocessed_dir / ".checkpoints" / "preprocessing.done"
         seq_marker = preprocessed_dir / ".checkpoints" / "sequence_build.done"
         x_train_exists = (preprocessed_dir / "X_train.npy").exists()
@@ -687,7 +704,6 @@ def main() -> None:
                 "Prerequisite stages missing: %s — auto-prepending to pipeline.",
                 ", ".join(missing),
             )
-            # Build the prerequisite chain from the earliest needed stage
             prereq_stages = []
             for stage_name in CheckpointManager.STAGES:
                 if stage_name in missing and stage_name not in stages_to_run:
@@ -696,36 +712,22 @@ def main() -> None:
                 s for s in stages_to_run if s not in prereq_stages
             ]
             logger.info("Expanded stages_to_run: %s", stages_to_run)
-
-    # n_classes is loaded lazily inside the split-load block below,
-    # after auto-prepended stages (preprocessing etc.) have completed.
-
-    if needs_splits:
-        logger.info("Loading split arrays from: %s", preprocessed_dir)
-        X_train, X_val, y_train, y_val, scaler, label_enc = (
-            load_split_data_train(preprocessed_dir)
-        )
-        n_classes = _load_n_classes(preprocessed_dir, args.dataset)
-        logger.info(
-            "Loaded — train: %s, val: %s, n_classes: %d",
-            X_train.shape, X_val.shape, n_classes,
-        )
     else:
         try:
             n_classes = _load_n_classes(preprocessed_dir, args.dataset)
         except FileNotFoundError:
-            n_classes = None  # Will be determined during preprocessing
             logger.info("n_classes not yet available (preprocessing will determine it)")
         if n_classes is not None:
-            logger.info("Skipping split data load (no training stages requested). n_classes=%d", n_classes)
+            logger.info("No training stages requested. n_classes=%d", n_classes)
         else:
-            logger.info("Skipping split data load (no training stages requested)")
+            logger.info("No training stages requested.")
 
     # =================================================================
     # STAGE 4: Hyperparameter tuning (optional)
     # =================================================================
     if "tuning" in stages_to_run:
         if args.tune:
+            _ensure_splits_loaded()
             pm.start_stage("tuning")
             logger.info("━━━ Stage 4/9: Hyperparameter tuning ━━━")
 
@@ -762,6 +764,7 @@ def main() -> None:
             logger.info("Skipping baselines (--skip-baselines).")
             rm.stage_complete("baselines")
         else:
+            _ensure_splits_loaded()
             pm.start_stage("baselines")
             logger.info("━━━ Stage 5/9: Baseline models ━━━")
 
@@ -844,6 +847,7 @@ def main() -> None:
     # STAGE 6: LSTM training
     # =================================================================
     if "lstm_train" in stages_to_run:
+        _ensure_splits_loaded()
         pm.start_stage("lstm_train")
         logger.info("━━━ Stage 6/9: LSTM training ━━━")
 
@@ -871,6 +875,7 @@ def main() -> None:
     # STAGE 7: Evaluation
     # =================================================================
     if "evaluation" in stages_to_run:
+        _ensure_splits_loaded()
         pm.start_stage("evaluation")
         logger.info("━━━ Stage 7/9: Evaluation ━━━")
 
@@ -926,6 +931,7 @@ def main() -> None:
     # STAGE 8: Visualization
     # =================================================================
     if "visualization" in stages_to_run:
+        _ensure_splits_loaded()
         pm.start_stage("visualization")
         logger.info("━━━ Stage 8/9: Visualization ━━━")
 
@@ -994,6 +1000,7 @@ def main() -> None:
     # STAGE 9: Export
     # =================================================================
     if "export" in stages_to_run:
+        _ensure_splits_loaded()
         pm.start_stage("export")
         logger.info("━━━ Stage 9/9: Export ━━━")
 

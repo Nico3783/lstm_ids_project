@@ -664,19 +664,62 @@ def main() -> None:
     needs_splits = stages_needing_splits & set(stages_to_run)
 
     X_train = X_val = y_train = y_val = scaler = label_enc = None
-    n_classes = _load_n_classes(preprocessed_dir, args.dataset)
+
+    # Auto-detect missing prerequisites: if user starts mid-pipeline
+    # (e.g. --start-stage lstm_train) but earlier stages haven't been
+    # run, prepend them automatically instead of crashing.
+    if needs_splits:
+        split_marker = preprocessed_dir / ".checkpoints" / "split_save.done"
+        preproc_marker = preprocessed_dir / ".checkpoints" / "preprocessing.done"
+        seq_marker = preprocessed_dir / ".checkpoints" / "sequence_build.done"
+        x_train_exists = (preprocessed_dir / "X_train.npy").exists()
+
+        missing = []
+        if not preproc_marker.exists():
+            missing.append("preprocessing")
+        if not seq_marker.exists():
+            missing.append("sequence_build")
+        if not x_train_exists:
+            missing.append("split_save")
+
+        if missing:
+            logger.warning(
+                "Prerequisite stages missing: %s — auto-prepending to pipeline.",
+                ", ".join(missing),
+            )
+            # Build the prerequisite chain from the earliest needed stage
+            prereq_stages = []
+            for stage_name in CheckpointManager.STAGES:
+                if stage_name in missing and stage_name not in stages_to_run:
+                    prereq_stages.append(stage_name)
+            stages_to_run = prereq_stages + [
+                s for s in stages_to_run if s not in prereq_stages
+            ]
+            logger.info("Expanded stages_to_run: %s", stages_to_run)
+
+    # n_classes is loaded lazily inside the split-load block below,
+    # after auto-prepended stages (preprocessing etc.) have completed.
 
     if needs_splits:
         logger.info("Loading split arrays from: %s", preprocessed_dir)
         X_train, X_val, y_train, y_val, scaler, label_enc = (
             load_split_data_train(preprocessed_dir)
         )
+        n_classes = _load_n_classes(preprocessed_dir, args.dataset)
         logger.info(
             "Loaded — train: %s, val: %s, n_classes: %d",
             X_train.shape, X_val.shape, n_classes,
         )
     else:
-        logger.info("Skipping split data load (no training stages requested). n_classes=%d", n_classes)
+        try:
+            n_classes = _load_n_classes(preprocessed_dir, args.dataset)
+        except FileNotFoundError:
+            n_classes = None  # Will be determined during preprocessing
+            logger.info("n_classes not yet available (preprocessing will determine it)")
+        if n_classes is not None:
+            logger.info("Skipping split data load (no training stages requested). n_classes=%d", n_classes)
+        else:
+            logger.info("Skipping split data load (no training stages requested)")
 
     # =================================================================
     # STAGE 4: Hyperparameter tuning (optional)

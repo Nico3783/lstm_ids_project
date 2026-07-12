@@ -616,49 +616,10 @@ def main() -> None:
         logger.info("Sequence build done.")
 
     # =================================================================
-    # STAGE 3: Train/Val/Test split
-    # =================================================================
-    if "split_save" in stages_to_run:
-        pm.start_stage("split_save")
-        logger.info("━━━ Stage 3/9: Splitting data ━━━")
-
-        # Load y_labels (small) and pass X file path directly
-        # to avoid loading the 7.5 GB array into RAM
-        y_labels = np.load(str(preprocessed_dir / "y_labels.npy"))
-        x_npy_path = str(preprocessed_dir / "X_sequences.npy")
-
-        # Split — pass x_path to skip loading into RAM
-        X_train, X_val, X_test, y_train, y_val, y_test = (
-            split_and_save(
-                y=y_labels,
-                output_dir=preprocessed_dir,
-                random_state=args.seed,
-                dataset=args.dataset,
-                x_path=x_npy_path,
-            )
-        )
-        logger.info(
-            "Split — train: %s, val: %s, test: %s",
-            X_train.shape, X_val.shape, X_test.shape,
-        )
-
-        rm.stage_complete("split_save", metadata={
-            "train_shape": list(X_train.shape),
-            "val_shape": list(X_val.shape),
-            "test_shape": list(X_test.shape),
-        })
-        # Free all split arrays — they're saved to disk; loaded lazily later
-        del X_train, X_val, X_test, y_train, y_val, y_test
-        del y_labels
-        if preprocessed_arrays is not None:
-            preprocessed_arrays.clear()
-            preprocessed_arrays = None
-        pm.end_stage("split_save")
-        gc.collect()
-        logger.info("Data split done.")
-
-    # =================================================================
-    # Load split data lazily — only when a stage that needs it starts
+    # Load split data lazily — only when a stage that needs it starts.
+    # This block MUST run BEFORE all stage execution blocks so that
+    # stages_to_run is finalized (with any auto-prepended prereqs)
+    # before any stage checks membership in it.
     # =================================================================
     stages_needing_splits = {"tuning", "baselines", "lstm_train", "evaluation", "visualization", "export"}
 
@@ -723,6 +684,48 @@ def main() -> None:
             logger.info("No training stages requested. n_classes=%d", n_classes)
         else:
             logger.info("No training stages requested.")
+
+    # =================================================================
+    # STAGE 3: Train/Val/Test split
+    # =================================================================
+    if "split_save" in stages_to_run:
+        pm.start_stage("split_save")
+        logger.info("━━━ Stage 3/9: Splitting data ━━━")
+
+        # Load y_labels (small) and pass X file path directly
+        # to avoid loading the 7.5 GB array into RAM
+        y_labels = np.load(str(preprocessed_dir / "y_labels.npy"))
+        x_npy_path = str(preprocessed_dir / "X_sequences.npy")
+
+        # Split — pass x_path to skip loading into RAM
+        X_train, X_val, X_test, y_train, y_val, y_test = (
+            split_and_save(
+                y=y_labels,
+                output_dir=preprocessed_dir,
+                random_state=args.seed,
+                dataset=args.dataset,
+                x_path=x_npy_path,
+            )
+        )
+        logger.info(
+            "Split — train: %s, val: %s, test: %s",
+            X_train.shape, X_val.shape, X_test.shape,
+        )
+
+        rm.stage_complete("split_save", metadata={
+            "train_shape": list(X_train.shape),
+            "val_shape": list(X_val.shape),
+            "test_shape": list(X_test.shape),
+        })
+        # Free all split arrays — they're saved to disk; loaded lazily later
+        del X_train, X_val, X_test, y_train, y_val, y_test
+        del y_labels
+        if preprocessed_arrays is not None:
+            preprocessed_arrays.clear()
+            preprocessed_arrays = None
+        pm.end_stage("split_save")
+        gc.collect()
+        logger.info("Data split done.")
 
     # =================================================================
     # STAGE 4: Hyperparameter tuning (optional)

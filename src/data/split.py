@@ -359,12 +359,24 @@ def split_and_save_disk(
     _validate_ratios(train_ratio, val_ratio, test_ratio)
     idx = np.arange(n_total)
 
+    # Stratified split requires ≥2 samples per class; fall back if not met
+    effective_stratify = stratified
+    if stratified:
+        _, class_counts = np.unique(y, return_counts=True)
+        min_count = int(class_counts.min())
+        if min_count < 2:
+            logger.warning(
+                "Stratified split requires ≥2 samples per class (min=%d) — "
+                "falling back to non-stratified split.", min_count,
+            )
+            effective_stratify = False
+
     idx_trainval, idx_test, _, _ = train_test_split(
         idx, y,
         test_size=test_ratio,
         random_state=random_state,
         shuffle=True,
-        stratify=y if stratified else None,
+        stratify=y if effective_stratify else None,
     )
     val_size_relative = val_ratio / (train_ratio + val_ratio)
     idx_train, idx_val, _, _ = train_test_split(
@@ -372,7 +384,7 @@ def split_and_save_disk(
         test_size=val_size_relative,
         random_state=random_state,
         shuffle=True,
-        stratify=y[idx_trainval] if stratified else None,
+        stratify=y[idx_trainval] if effective_stratify else None,
     )
     logger.info(
         "Index split — train: %d, val: %d, test: %d",

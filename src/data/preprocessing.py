@@ -379,6 +379,55 @@ def map_unsw_nb15_labels(df: pd.DataFrame) -> pd.DataFrame:
 
 # Step 6 — One-Hot Encoding
 
+# Top-N categories per feature for UNSW-NB15 to prevent
+# feature explosion from rare categorical values.
+# proto: 133 unique → top 5 cover 92.5% of data
+# service: 13 unique → top 5 cover 86% of data
+# state: 11 unique → top 4 cover 98% of data
+UNSW_NB15_TOP_N: Dict[str, int] = {
+    "proto": 5,
+    "service": 5,
+    "state": 4,
+}
+
+
+def _limit_rare_categories(
+    df: pd.DataFrame,
+    top_n: Dict[str, int],
+) -> pd.DataFrame:
+    """
+    Replace rare categorical values with ``other`` to control
+    feature dimensionality after one-hot encoding.
+
+    For each column in *top_n*, keeps the *top_n[col]* most
+    frequent values and maps everything else to ``other``.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    top_n : dict
+        Mapping of column name → number of top values to keep.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with rare values replaced.
+    """
+    df = df.copy()
+    for col, n in top_n.items():
+        if col not in df.columns:
+            continue
+        top_values = df[col].value_counts().head(n).index.tolist()
+        mask = ~df[col].isin(top_values)
+        n_replaced = mask.sum()
+        df.loc[mask, col] = "other"
+        logger.info(
+            "Column '%s': kept top %d values, mapped %d rows to 'other'.",
+            col, n, n_replaced,
+        )
+    return df
+
+
 def encode_categorical_features(
     df: pd.DataFrame,
     dataset: str = "nsl_kdd",
@@ -392,6 +441,10 @@ def encode_categorical_features(
     and ``flag`` columns — preserving all dummy categories
     (drop_first=False) so ordinal assumptions are not
     incorrectly imposed.
+
+    For UNSW-NB15: limits rare categories to top-N per feature
+    before encoding to prevent feature explosion (133 proto
+    values → top 5 + ``other``).
 
     Parameters
     ----------
@@ -416,6 +469,8 @@ def encode_categorical_features(
             c for c in UNSW_NB15_CATEGORICAL_FEATURES
             if c in df.columns
         ]
+        # Limit rare categories before encoding
+        df = _limit_rare_categories(df, UNSW_NB15_TOP_N)
     elif dataset == "cicids2017":
         # CICIDS2017 features are all numeric — no encoding needed
         cat_cols = []

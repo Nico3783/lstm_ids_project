@@ -24,6 +24,7 @@
 #            - Split summary statistics for Chapter 4 tables
 #            - Saved split artifacts to data/processed/
 
+import gc
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 

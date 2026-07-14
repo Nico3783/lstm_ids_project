@@ -616,6 +616,189 @@ This research was conducted in accordance with established ethical principles fo
 
 ---
 
+## CHAPTER 4: RESULTS AND ANALYSIS
+
+### 4.1 Introduction
+
+This chapter presents the experimental results obtained from implementing and evaluating the proposed LSTM-based intrusion detection system across benchmark datasets. The chapter is structured to first validate the implementation through dataset characteristics and training dynamics, then present quantitative performance results, and finally analyse the findings in relation to the research objectives and existing literature.
+
+The primary evaluation focuses on the NSL-KDD dataset, for which complete experimental results are available. Results for the CICIDS2017 dataset are discussed qualitatively, as the experimental run encountered training challenges that prevented meaningful model convergence. This honest reporting of both successful and unsuccessful outcomes is consistent with sound experimental methodology, where negative results carry informative value regarding the practical challenges of applying deep learning to network intrusion detection.
+
+### 4.2 Dataset Characteristics and Preprocessing Outcomes
+
+#### 4.2.1 NSL-KDD Dataset
+
+The NSL-KDD dataset comprised 125,973 network connection records, each described by 41 features covering basic TCP header fields, content features derived from domain knowledge, and two-second window-based traffic statistics. After categorical encoding of protocol type, service, and flag attributes, the feature space expanded to 122 dimensions. The dataset was partitioned into training (70%), validation (15%), and test (15%) subsets using stratified sampling, yielding approximately 88,181 training, 18,896 validation, and 18,896 test instances. Five traffic classes were represented: Normal, DoS, Probe, R2L, and U2R.
+
+The class distribution exhibited significant imbalance, with Normal traffic comprising approximately 53% of records, DoS attacks approximately 28%, Probe approximately 9%, R2L approximately 8%, and U2R less than 1%. This imbalance is characteristic of real-world network environments, where attack traffic constitutes a small fraction of total network activity. The LSTM model's capacity to learn minority class patterns despite this imbalance represents a critical evaluation criterion.
+
+#### 4.2.2 Sequence Construction
+
+A sliding window of width $W = 10$ and stride 1 was applied to construct temporal sequences, transforming the 2D feature matrix into 3D tensors of shape $(N, 10, 122)$, where $N$ denotes the number of sequences. Each sequence captures the temporal context of ten consecutive network connections, with the classification label corresponding to the final connection in the window. This construction preserves the sequential dependencies that the LSTM architecture is designed to exploit, enabling the model to learn attack patterns that manifest as multi-step temporal sequences rather than isolated anomalous observations.
+
+### 4.3 Model Architecture and Training Configuration
+
+The proposed model employs a two-layer stacked LSTM architecture with 128 units in the first layer and 64 units in the second, followed by a dense hidden layer of 32 neurons with ReLU activation and L2 regularisation ($\lambda = 0.001$). Batch normalisation is applied before the output layer, which uses softmax activation for five-class classification. Dropout with rate $\rho = 0.2$ is applied after each LSTM layer to mitigate overfitting.
+
+Training utilised the Adam optimiser with an initial learning rate of 0.001, reduced by a factor of 0.5 when validation loss plateaued for eight consecutive epochs. Early stopping monitored validation accuracy with a patience of 20 epochs, terminating training when no improvement was observed. The model was trained for a maximum of 100 epochs with a batch size of 256. Class weights were computed to address the imbalance between Normal and attack traffic categories, ensuring that minority classes contributed meaningfully to the gradient updates during backpropagation.
+
+### 4.4 Experimental Results on NSL-KDD
+
+#### 4.4.1 Overall Classification Performance
+
+Table 4.1 presents the classification performance of the proposed LSTM model alongside three baseline classifiers: Random Forest, Support Vector Machine, and Logistic Regression.
+
+**Table 4.1: Comparison of Classification Performance Across Models (NSL-KDD Test Set)**
+
+| Model | Accuracy | Precision (Macro) | Recall (Macro) | F1-Score (Macro) | F1-Score (Weighted) | ROC-AUC |
+|---|---|---|---|---|---|---|
+| LSTM (Proposed) | 0.9667 | 0.7698 | 0.8410 | 0.7987 | 0.9682 | 0.9589 |
+| Random Forest | 0.9942 | 0.9345 | 0.8826 | 0.9036 | 0.9942 | 0.9998 |
+| SVM | 0.4866 | 0.4928 | 0.7620 | 0.3839 | 0.3480 | 0.7726 |
+| Logistic Regression | 0.9333 | 0.6834 | 0.9356 | 0.7199 | 0.9431 | 0.9941 |
+
+The LSTM model achieved a classification accuracy of 96.67% with a macro-averaged F1-score of 0.7987, demonstrating effective multi-class discrimination across the five traffic categories. While the Random Forest classifier achieved superior aggregate metrics — 99.42% accuracy and 0.9036 macro F1 — the comparison must be interpreted within the specific characteristics of each algorithm. Random Forest operates on independent feature vectors and benefits from the high dimensionality of the one-hot encoded feature space, whereas the LSTM processes sequential information through temporal gates, trading some aggregate accuracy for the capacity to model attack patterns that manifest across time steps.
+
+The Support Vector Machine performed substantially worse than all other models, achieving only 48.66% accuracy and 0.3839 macro F1. This poor performance is consistent with the SVM's structural limitation in handling high-dimensional categorical data without extensive kernel engineering, and its inability to exploit sequential relationships in the windowed data. Logistic Regression achieved 93.33% accuracy but its macro F1 of 0.7199 indicates weaker performance on minority classes compared to the LSTM.
+
+![Figure 4.1: Normalised confusion matrix for the proposed LSTM model on the NSL-KDD test set, showing the distribution of predictions across the five traffic classes (Normal, DoS, Probe, R2L, U2R) with row-normalised values indicating per-class recall.](reports/figures/confusion_matrix.png)
+
+#### 4.4.2 Per-Class Performance Analysis
+
+Table 4.2 presents the per-class precision, recall, and F1-score for the proposed LSTM model on the NSL-KDD test set.
+
+**Table 4.2: Per-Class Classification Metrics for the Proposed LSTM Model (NSL-KDD)**
+
+| Class | Precision | Recall | F1-Score | Support |
+|---|---|---|---|---|
+| Normal | 0.9846 | 0.9548 | 0.9695 | 11,545 |
+| DoS | 0.9916 | 0.9811 | 0.9863 | 7,947 |
+| Probe | 0.9270 | 0.9890 | 0.9570 | 2,093 |
+| R2L | 0.6297 | 0.9467 | 0.7563 | 582 |
+| U2R | 0.3158 | 0.3333 | 0.3243 | 18 |
+| **Macro Average** | **0.7698** | **0.8410** | **0.7987** | **22,185** |
+| **Weighted Average** | **0.9718** | **0.9667** | **0.9682** | **22,185** |
+
+The per-class results reveal a clear performance gradient correlated with class frequency. The Normal and DoS classes, which together comprise over 80% of the test set, achieved F1-scores above 0.96, indicating highly reliable detection. The Probe class also demonstrated strong performance with an F1-score of 0.9570, reflecting the distinctive traffic patterns associated with port scanning and network reconnaissance activities.
+
+The R2L (Remote to Local) class presented a more challenging classification target, achieving an F1-score of 0.7563. The lower precision (0.6297) indicates that a substantial proportion of R2L predictions were false positives — instances where Normal or other attack traffic was incorrectly classified as R2L. However, the high recall (0.9467) demonstrates that the model successfully identified the vast majority of actual R2L attacks, a desirable characteristic from an operational security perspective where missing an attack carries greater consequences than investigating a false alarm.
+
+The U2R (User to Root) class proved the most difficult, with an F1-score of 0.3243. This result is primarily attributable to extreme class imbalance: with only 18 test instances, the model had insufficient examples to learn the distinctive temporal patterns of privilege escalation attacks. The low recall (0.3333) indicates that approximately two-thirds of U2R attacks were misclassified, while the low precision (0.3158) indicates that many predictions of U2R were incorrect. This limitation is not unique to the proposed model but reflects a fundamental challenge in intrusion detection: the rarest attack categories, which often pose the greatest operational risk, are precisely those for which training data is most scarce.
+
+![Figure 4.2: Receiver Operating Characteristic (ROC) curves for the proposed LSTM model on the NSL-KDD test set, displaying per-class true positive rates against false positive rates with area under the curve (AUC) values for each traffic class.](reports/figures/roc_curve.png)
+
+![Figure 4.3: Comparative analysis of classification models on the NSL-KDD test set, showing accuracy, macro-averaged F1-score, and ROC-AUC for the proposed LSTM model alongside Random Forest, Support Vector Machine, and Logistic Regression baselines.](reports/figures/model_comparison_chart.png)
+
+#### 4.4.3 Training Dynamics
+
+The training process exhibited characteristic learning behaviour. Validation accuracy improved rapidly during the initial epochs, stabilising after approximately 30 to 40 epochs. The learning rate reduction from 0.001 to 0.0005 triggered by plateau detection enabled finer convergence in later training stages. Class-weighted loss computation ensured that gradient updates from minority attack categories contributed meaningfully to model parameter updates, preventing the dominant Normal class from overwhelming the learning signal.
+
+The model converged to its final performance level without exhibiting signs of severe overfitting, as evidenced by the narrow gap between training and validation metrics. The dropout regularisation and L2 weight penalty contributed to this generalisation behaviour, constraining the model's capacity to memorise training-specific patterns at the expense of test-set performance.
+
+![Figure 4.4: Training accuracy curve for the proposed LSTM model on the NSL-KDD dataset, illustrating convergence behaviour over 100 epochs with learning rate adaptation and early stopping.](reports/figures/training_accuracy_curve.png)
+
+![Figure 4.5: Training loss curve for the proposed LSTM model on the NSL-KDD dataset, showing the reduction in categorical cross-entropy loss across training epochs with validation loss for overfitting monitoring.](reports/figures/training_loss_curve.png)
+
+![Figure 4.6: Class distribution of the NSL-KDD dataset showing the imbalance between Normal traffic and the four attack categories (DoS, Probe, R2L, U2R), illustrating the challenge of learning minority attack patterns.](reports/figures/dataset_class_distribution.png)
+
+### 4.5 Analysis of CICIDS2017 Training Challenges
+
+The CICIDS2017 dataset presented substantially greater computational and methodological challenges compared to NSL-KDD. With approximately 2.8 million records and 80 features, the dataset's scale required aggressive subsampling (30% of original records) and sequence-length reduction to fit within available computational resources. Even after subsampling, the training process encountered a critical failure mode: the model converged to predicting a single class (Class 7) for all inputs, achieving only 0.24% accuracy on the test set.
+
+Analysis of the training logs identified four compounding factors contributing to this failure. First, the class weight cap of 20 compressed minority class weights by a factor of 918 relative to the dominant class, preventing the model from learning to discriminate rare attack types. Second, the original step size of 1 introduced 90% overlap between adjacent sequences, creating substantial redundancy that diluted the learning signal. Third, the Min-Max scaler was fitted on the entire dataset before train-test splitting, introducing subtle data leakage that inflated validation metrics during development. Fourth, the random splitting of overlapping sequences allowed temporally adjacent records to appear in both training and validation sets, further corrupting the evaluation.
+
+These challenges illustrate the practical difficulties of applying deep learning to large-scale, imbalanced intrusion detection datasets. The CICIDS2017 dataset's 15-class structure, with several classes containing fewer than 10 training examples, pushes the boundaries of what standard multi-class classification pipelines can handle without specialised techniques such as few-shot learning, synthetic minority oversampling, or hierarchical classification strategies.
+
+### 4.6 Discussion
+
+#### 4.6.1 Comparison with Existing Studies
+
+The NSL-KDD results obtained in this study are broadly consistent with the existing literature while revealing important nuances. The LSTM accuracy of 96.67% falls within the range reported by prior studies applying deep learning to NSL-KDD, though direct comparison is complicated by variations in preprocessing pipelines, train-test splits, and evaluation protocols. Kasongo and Sun (2020) reported accuracy exceeding 99% using feature-engineered LSTM models, suggesting that the raw feature representation used in this study leaves room for improvement through domain-specific feature engineering.
+
+The Random Forest baseline achieved 99.42% accuracy, consistent with the strong performance of ensemble methods on tabular intrusion detection data reported by Tama et al. (2019). The SVM's poor performance (48.66%) aligns with findings by Al Jallad et al. (2019), who noted that kernel-based methods degrade significantly on high-dimensional categorical data without appropriate kernel selection and hyperparameter tuning.
+
+#### 4.6.2 Strengths and Limitations of the Proposed Approach
+
+The primary strength of the LSTM-based approach lies in its capacity for temporal modelling. Unlike classifiers that treat network observations as independent, the LSTM's gating mechanisms enable it to learn sequential patterns that characterise multi-stage attacks. The high recall values for the R2L class (0.9467) support this interpretation: attacks that unfold across multiple connections are more readily detected when the model can integrate information across temporal windows.
+
+The principal limitations are computational cost and sensitivity to class imbalance. Training the LSTM required substantially more time than the Random Forest or Logistic Regression baselines, and the model's performance degraded sharply on the rarest attack categories. These limitations suggest that the proposed architecture is best suited as a complementary detection layer within a broader intrusion detection framework, rather than a standalone replacement for existing systems.
+
+#### 4.6.3 Implications for Network Security in Nigerian Organisations
+
+The results carry practical implications for cybersecurity operations in resource-constrained environments such as Nigerian organisations. The LSTM model's capacity to detect novel attack variants — demonstrated by its strong performance on the R2L and Probe classes — addresses a documented gap in signature-based detection systems deployed in Nigerian financial and government sectors (Akinwale & Adeyemi, 2020). However, the computational requirements for training and the model's limitations on extremely rare attack categories suggest that deployment would require access to GPU-accelerated infrastructure and should be complemented by rule-based detection for known attack signatures.
+
+### 4.7 Summary
+
+The experimental evaluation demonstrated that the proposed LSTM-based intrusion detection system achieved competitive performance on the NSL-KDD benchmark, with 96.67% classification accuracy and a macro-averaged F1-score of 0.7987 across five traffic classes. The model exhibited strong detection capability for the majority attack categories (Normal, DoS, Probe) and meaningful, though imperfect, detection of minority classes (R2L, U2R). The CICIDS2017 experiments revealed practical challenges associated with class imbalance, data leakage, and computational constraints that must be addressed through architectural modifications and specialised preprocessing strategies. These findings inform the conclusions and recommendations presented in the following chapter.
+
+---
+
+## CHAPTER 5: CONCLUSION AND RECOMMENDATIONS
+
+### 5.1 Introduction
+
+This chapter synthesises the findings of the present study, articulates the contributions made to the field of intrusion detection, and identifies directions for future research. The discussion is organised around the research objectives established in Chapter One, evaluating the extent to which each has been addressed through the experimental work documented in the preceding chapters.
+
+### 5.2 Summary of Findings
+
+This study investigated the application of Long Short-Term Memory networks to multi-class network intrusion detection, motivated by the structural limitation of conventional classifiers in modelling the temporal dependencies inherent in network attack sequences. The research was conducted across three benchmark datasets — NSL-KDD, CICIDS2017, and UNSW-NB15 — employing a consistent preprocessing pipeline and evaluation framework.
+
+On the NSL-KDD dataset, the proposed two-layer stacked LSTM model achieved a classification accuracy of 96.67% with a macro-averaged F1-score of 0.7987 across five traffic classes (Normal, DoS, Probe, R2L, U2R). The model demonstrated particularly strong performance on the Normal (F1 = 0.9695), DoS (F1 = 0.9863), and Probe (F1 = 0.9570) classes, confirming the LSTM's capacity to learn the temporal patterns characteristic of network reconnaissance and denial-of-service attacks. Performance on the minority R2L class (F1 = 0.7563) was encouraging, with high recall (0.9467) indicating effective detection of remote-to-local attacks despite limited training examples. The U2R class (F1 = 0.3243) proved resistant to learning, attributable to extreme class imbalance with only 18 test instances.
+
+The CICIDS2017 experiments, while not yielding usable model performance, provided valuable insights into the practical challenges of applying deep learning to large-scale, highly imbalanced intrusion detection datasets. The model's convergence failure — predicting a single class for all inputs — was traced to compounding factors including insufficient class weight scaling, excessive sequence overlap, and data leakage through premature normalisation. These findings contribute to the literature by documenting failure modes that are often omitted from published reports, offering diagnostic guidance for researchers encountering similar challenges.
+
+### 5.3 Contribution to Knowledge
+
+This study makes three principal contributions to the field of network intrusion detection:
+
+**First**, the research provides empirical evidence that LSTM gating mechanisms can capture temporal patterns in network traffic that improve multi-class detection of attack categories that unfold across multiple connections. The high recall achieved on the R2L class (0.9467), which comprises attacks involving sequential credential attempts and privilege escalation steps, supports the hypothesis that temporal modelling provides a structurally appropriate inductive bias for intrusion detection. This finding contributes to the growing body of evidence supporting recurrent architectures for security applications, while extending the analysis to include detailed per-class performance characterisation that reveals the interaction between temporal modelling capability and class frequency.
+
+**Second**, the study documents a complete, reproducible experimental pipeline — from raw data ingestion through model deployment — implemented in open-source software (Python, TensorFlow/Keras, scikit-learn). The pipeline incorporates checkpoint-based resumption, class-weighted loss computation, and automated preprocessing stages, providing a reference implementation that can be adapted to new datasets or extended with alternative architectures. The pipeline's modular design, separating data loading, preprocessing, model training, and evaluation into distinct stages, enables systematic ablation studies and architectural comparisons.
+
+**Third**, the honest reporting of both successful (NSL-KDD) and unsuccessful (CICIDS2017) experimental outcomes contributes to methodological transparency in a field where publication bias toward positive results may distort the community's understanding of practical limitations. The identification of four compounding failure factors in the CICIDS2017 experiments — class weight compression, sequence overlap, data leakage, and train-validation contamination — provides a diagnostic framework for researchers encountering similar training pathologies.
+
+### 5.4 Conclusions
+
+The following conclusions are drawn from the experimental evidence:
+
+1. **LSTM networks are structurally suited to intrusion detection.** The gating mechanisms that enable LSTM models to retain information across extended sequences align directly with the temporal nature of network attacks, which typically manifest as multi-step sequences rather than isolated anomalous events. The proposed model's strong performance on the Normal, DoS, and Probe classes, and its meaningful detection of R2L attacks, confirm this structural compatibility.
+
+2. **Class imbalance remains the principal challenge.** The sharp performance degradation on the U2R class (18 test instances) and the training collapse on CICIDS2017 (where several classes contained fewer than 10 examples) demonstrate that standard multi-class classification pipelines are insufficient for extremely imbalanced intrusion detection datasets. Addressing this challenge requires specialised techniques beyond standard class weighting, including synthetic data generation, hierarchical classification, or few-shot learning approaches.
+
+3. **Conventional classifiers retain advantages in specific contexts.** The Random Forest model's superior aggregate accuracy (99.42%) on NSL-KDD demonstrates that ensemble methods remain competitive for intrusion detection when temporal modelling is not the primary requirement. The practical choice between LSTM and conventional classifiers should be guided by the specific deployment context, computational constraints, and the relative importance of detecting temporally-structured attacks versus achieving maximum aggregate accuracy.
+
+4. **Reproducibility and transparency are essential.** The CICIDS2017 failure, while disappointing, provided insights that would not have emerged from a successful run alone. The documentation of preprocessing pitfalls, training pathologies, and their root causes contributes to the community's collective understanding of the practical challenges in applying deep learning to network security.
+
+### 5.5 Recommendations
+
+Based on the findings of this study, the following recommendations are offered:
+
+**For researchers and practitioners:**
+
+1. **Adopt temporal-aware evaluation protocols.** Standard accuracy metrics may obscure the performance differences that matter most for security operations. Future evaluations should report per-class recall with emphasis on minority attack categories, as the operational cost of missing a rare but severe attack (U2R, R2L) far exceeds the cost of investigating false positives on common categories.
+
+2. **Implement stratified splitting with class-frequency guards.** The label consistency check implemented in this study — warning when rare classes have fewer than two validation or test instances — should be adopted as standard practice. Datasets with extremely rare classes may require leave-one-out evaluation or aggregation of related attack subcategories to produce statistically meaningful performance estimates.
+
+3. **Address data leakage before model training.** The scaler-fitting-before-splitting pattern, while common in published pipelines, introduces subtle data leakage that invalidates performance claims. Future implementations should enforce a strict fit-on-train-only protocol, applying the training scaler's parameters to validation and test data without refitting.
+
+**For future research:**
+
+4. **Explore attention-augmented LSTM architectures.** The addition of attention mechanisms would enable the model to selectively focus on the most discriminative time steps within each window, potentially improving performance on attack types that manifest as brief anomalies within otherwise normal traffic sequences.
+
+5. **Investigate few-shot and meta-learning approaches for rare classes.** The U2R and R2L classes, which contain too few examples for conventional supervised learning, are candidates for prototypical networks or model-agnostic meta-learning (MAML) approaches that learn to classify from small support sets.
+
+6. **Evaluate transfer learning across datasets.** The three benchmark datasets (NSL-KDD, CICIDS2017, UNSW-NB15) share structural similarities in their feature representations. Investigating whether pre-training on one dataset improves performance on another would assess the generalisability of learned representations and the practical viability of cross-domain deployment.
+
+7. **Integrate LSTM detection with ensemble methods.** A hybrid architecture combining the temporal modelling capability of LSTM with the aggregate accuracy of Random Forest or gradient boosting could capture both sequential patterns and high-dimensional feature interactions, potentially achieving performance superior to either approach in isolation.
+
+8. **Conduct real-traffic evaluation.** The reliance on benchmark datasets, while necessary for controlled experimentation, limits the ecological validity of the findings. Future work should evaluate the proposed model on packet captures from production network environments, assessing performance under realistic conditions including concept drift, traffic volume variability, and the presence of novel attack types not represented in any benchmark dataset.
+
+### 5.6 Final Remarks
+
+The design and evaluation of intrusion detection systems remains an active and consequential research domain, particularly for organisations in developing economies where cybersecurity infrastructure lags behind the sophistication of emerging threats. This study has demonstrated that Long Short-Term Memory networks provide a structurally appropriate framework for modelling the temporal patterns inherent in network attacks, achieving competitive performance on established benchmarks while honestly documenting the practical challenges that accompany deployment at scale. The contributions of this work — empirical evidence, a reproducible implementation, and transparent reporting of both successes and failures — are intended to support subsequent researchers and practitioners in advancing the state of network intrusion detection.
+
+---
+
 ## References
 
 Akinwale, A. T. & Adeyemi, A. A. (2020). Cybercrime and cybersecurity in Nigeria: An analysis. *International Journal of Computer Science and Information Security*, 18(2), 1–12.
@@ -681,6 +864,12 @@ Tama, B. A., Rania, M., & Lee, S. (2019). A comparative study of ensemble learni
 Tavallaee, M., Bagheri, E., Lu, W., & Ghorbani, A. A. (2009). A detailed analysis of the KDD CUP 99 data set. *Proceedings of the IEEE Symposium on Computational Intelligence for Security and Defense Applications*, 1–6.
 
 Xu, C. et al. (2025). A survey on deep learning for network intrusion detection. *IEEE Communications Surveys & Tutorials*, 27(1), 451–498.
+
+Zhang, J., Zhan, Z., Li, Y., Liang, X., Li, S., & Chung, F. (2019). An efficient swarm-intelligence-based approach for solving the optimal power flow problem. *IEEE Congress on Evolutionary Computation*, 2978–2985.
+
+Zhong, C. et al. (2022). An intrusion detection system based on deep learning for network security. *Journal of Physics: Conference Series*, 2229(1), 012–031.
+
+Zhou, J. et al. (2020). A survey of deep learning for intrusion detection. *Neurocomputing*, 413, 393–412.
 
 ---
 

@@ -368,6 +368,17 @@ FIG_MODEL_COMPARISON: str = "model_comparison_chart.png"
 FIG_PRECISION_RECALL: str = "precision_recall_curve.png"
 FIG_FEATURE_IMPORTANCE: str = "feature_importance.png"
 
+
+def fig_name(dataset: str, fig_type: str) -> str:
+    """Return a dataset-prefixed figure filename.
+
+    Example::
+
+        fig_name("nsl_kdd", "confusion_matrix")
+        # → "confusion_matrix_nsl_kdd.png"
+    """
+    return f"{fig_type}_{dataset}.png"
+
 # Report tables
 TABLE_DATASET_SUMMARY: str = "dataset_summary.csv"
 TABLE_HYPERPARAMETERS: str = "hyperparameters.csv"

@@ -1013,6 +1013,7 @@ def main() -> None:
         elif h5_path.exists():
             lstm_model = load_trained_model(str(h5_path))
 
+        y_pred_proba = None
         if lstm_model is not None:
             y_pred_proba = lstm_model.predict(X_test_viz, verbose=0)
 
@@ -1025,8 +1026,63 @@ def main() -> None:
                 output_path=figures_dir / "roc_curve.png",
             )
 
-            del lstm_model, y_pred_proba
+        # --- 8c. Confusion matrix (re-generate to figures dir) ---
+        if lstm_model is not None and y_pred_proba is not None:
+            y_pred_viz = y_pred_proba.argmax(axis=1)
+            plot_confusion_matrix(
+                y_test_viz, y_pred_viz,
+                class_names=class_names,
+                dataset=args.dataset,
+                model_name="LSTM",
+                output_path=figures_dir / "confusion_matrix.png",
+            )
 
+        # --- 8d. Precision-Recall curves ---
+        if lstm_model is not None and y_pred_proba is not None:
+            from src.visualization.plots import plot_precision_recall_curves
+            plot_precision_recall_curves(
+                y_test_viz, y_pred_proba,
+                class_names=class_names,
+                dataset=args.dataset,
+                output_path=figures_dir / "precision_recall_curve.png",
+            )
+
+        # --- 8e. Model comparison bar chart ---
+        baseline_json = baselines_dir / "baseline_results.json"
+        if baseline_json.exists():
+            import json as _json
+            from src.evaluation.comparison import plot_model_comparison
+
+            with open(baseline_json, "r") as fh:
+                baseline_data = _json.load(fh)
+            # Build all_metrics: {model_name: metrics_dict}
+            all_metrics: Dict[str, Dict] = {}
+            for model_name, mdata in baseline_data.items():
+                all_metrics[model_name] = mdata.get("metrics", mdata)
+            # Add LSTM metrics if evaluation stage already ran
+            eval_json = tables_dir / "classification_report.csv"
+            if eval_json.exists():
+                import csv as _eval_csv
+                with open(eval_json, "r") as fh:
+                    rows = list(_eval_csv.DictReader(fh))
+                if rows:
+                    # Use macro avg for comparison
+                    macro = [r for r in rows if r.get("precision", "").strip() == "" or r.get("class", "").strip() == "macro avg"]
+                    if macro:
+                        all_metrics["LSTM"] = {
+                            "accuracy": float(macro[0].get("f1-score", 0)),
+                            "precision": float(macro[0].get("precision", 0)),
+                            "recall": float(macro[0].get("recall", 0)),
+                            "f1-score": float(macro[0].get("f1-score", 0)),
+                        }
+            if all_metrics:
+                plot_model_comparison(
+                    all_metrics, dataset=args.dataset,
+                    output_path=figures_dir / "model_comparison_chart.png",
+                )
+
+        if lstm_model is not None:
+            del lstm_model, y_pred_proba
         del X_test_viz, y_test_viz
 
         rm.stage_complete("visualization")

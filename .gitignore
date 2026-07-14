@@ -53,6 +53,9 @@ pipeline_output.txt
 .matplotlib_cache/
 zSamples/
 
+# Downloaded zips
+*.zip
+
 # Environment
 *.env
 .env

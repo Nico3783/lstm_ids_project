@@ -141,6 +141,8 @@ class CheckpointManager:
         """Relative paths (from dataset_dir) expected after each stage.
 
         These match the actual file paths produced by ``run_pipeline.py``.
+        Dataset isolation is handled by the output directory structure
+        (``outputs/<dataset>/``), not by filename prefixes.
         """
         artifacts: Dict[str, List[str]] = {
             "preprocessing": [
@@ -190,6 +192,9 @@ class CheckpointManager:
                 "figures/training_accuracy_curve.png",
                 "figures/training_loss_curve.png",
                 "figures/roc_curve.png",
+                "figures/confusion_matrix.png",
+                "figures/precision_recall_curve.png",
+                "figures/model_comparison_chart.png",
             ],
             "export": [
                 "exported/lstm_ids_model.keras",

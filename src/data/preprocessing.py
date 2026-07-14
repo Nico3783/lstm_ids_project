@@ -85,6 +85,11 @@ def drop_irrelevant_columns(
     if dataset == "nsl_kdd":
         cols_to_drop.append(NSL_KDD_DIFFICULTY_COLUMN)
 
+    if dataset == "unsw_nb15":
+        if "id" in df.columns:
+            cols_to_drop.append("id")
+            logger.info("Dropped UNSW-NB15 sequential 'id' column (no predictive value).")
+
     existing = [c for c in cols_to_drop if c in df.columns]
     if existing:
         df = df.drop(columns=existing)
@@ -728,20 +733,22 @@ def preprocess_dataset(
     feature_range: Tuple[float, float] = (0.0, 1.0),
     save_interim_files: bool = True,
     artifacts_dir: Optional[Path] = None,
-) -> Tuple[np.ndarray, np.ndarray, MinMaxScaler, List[str], Dict]:
+    skip_scaling: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, object, List[str], Dict]:
     """
     Execute the complete preprocessing pipeline on the full
-    (merged) dataset and return scaled numpy arrays.
+    (merged) dataset and return numpy arrays.
 
     This function is called by the main pipeline BEFORE the
     train/val/test split so the split module receives a
-    clean, encoded, scaled array.
+    clean, encoded array.
 
     .. warning::
-        When using this function the scaler is fitted on the
-        entire dataset.  For strict leakage prevention, use
-        ``preprocess_train_val_test()`` which fits the scaler
-        on the training split only.
+        When ``skip_scaling=False`` (default), the scaler is
+        fitted on the entire dataset — a source of leakage.
+        For strict leakage prevention, use
+        ``skip_scaling=True`` and fit the scaler on the
+        training split only in a later stage.
 
     Pipeline
     --------
@@ -751,7 +758,7 @@ def preprocess_dataset(
     4.  Map labels to integers
     5.  One-hot encode categorical features
     6.  Separate X and y
-    7.  Fit and apply MinMax scaler
+    7.  Fit and apply MinMax scaler (unless skip_scaling=True)
     8.  Save preprocessing artifacts
 
     Parameters
@@ -767,13 +774,17 @@ def preprocess_dataset(
         Save each intermediate stage as CSV for inspection.
     artifacts_dir : Path, optional
         Directory to save scaler + metadata.
+    skip_scaling : bool
+        If True, return unscaled 2D arrays and a dummy scaler.
+        Use this when the scaler should be fitted later on the
+        training split only (leakage-safe approach).
 
     Returns
     -------
     tuple of
-        (X_scaled: np.ndarray,
+        (X: np.ndarray (2D, scaled or unscaled),
          y: np.ndarray,
-         scaler: MinMaxScaler,
+         scaler: MinMaxScaler or None,
          feature_names: list of str,
          metadata: dict)
     """
@@ -814,6 +825,20 @@ def preprocess_dataset(
     # Step 5 — Map labels
     df = _map_labels(df, dataset=dataset)
 
+    # Step 5b — Coarse-grained class grouping (UNSW-NB15 only)
+    if dataset == "unsw_nb15":
+        from src.utils.constants import (
+            UNSW_NB15_COARSE_MAPPING,
+            UNSW_NB15_COARSE_CLASS_NAMES,
+        )
+        target = UNSW_NB15_TARGET_COLUMN
+        n_before = df[target].nunique()
+        df[target] = df[target].map(UNSW_NB15_COARSE_MAPPING)
+        n_after = df[target].nunique()
+        logger.info(
+            "Coarse-grained remapping: %d → %d classes.", n_before, n_after,
+        )
+
     # Step 6 — One-hot encode
     df = encode_categorical_features(
         df, dataset=dataset, drop_first=drop_first
@@ -831,14 +856,22 @@ def preprocess_dataset(
         len(X_df), len(feature_names),
     )
 
-    # Step 8 — Scale
-    scaler = fit_scaler(X_df, feature_range=feature_range)
-    X_scaled = apply_scaler(X_df, scaler)
+    # Step 8 — Scale (or return unscaled for leakage-safe splitting)
+    if skip_scaling:
+        scaler = None
+        X_out = X_df.values.astype(np.float32)
+        logger.info(
+            "Scaling skipped — returning unscaled 2D array for "
+            "leakage-safe train-only scaler fitting."
+        )
+    else:
+        scaler = fit_scaler(X_df, feature_range=feature_range)
+        X_out = apply_scaler(X_df, scaler)
     y_array = y.values.astype(np.int64)
 
     if save_interim_files:
         scaled_df = pd.DataFrame(
-            X_scaled, columns=feature_names
+            X_out, columns=feature_names
         )
         scaled_df["label"] = y_array
         save_interim(scaled_df, "scaled")
@@ -850,22 +883,17 @@ def preprocess_dataset(
     if dataset == "nsl_kdd":
         class_names = NSL_KDD_CLASS_NAMES
     elif dataset == "cicids2017":
-        # Recover the original category names from the mapping
-        target = CICIDS2017_TARGET_COLUMN.strip()
-        # The label column was mapped, but we can reconstruct
-        # from the sorted unique values before mapping
-        # Use a known ordering: BENIGN first, then alphabetical
-        # (matches map_cicids2017_labels logic)
-        # Since labels are already integers, use the mapping
-        # saved during label mapping
         from src.utils.constants import CICIDS2017_CLASS_NAMES
         class_names = CICIDS2017_CLASS_NAMES
+    elif dataset == "unsw_nb15":
+        from src.utils.constants import UNSW_NB15_COARSE_CLASS_NAMES
+        class_names = UNSW_NB15_COARSE_CLASS_NAMES
     else:
         class_names = [str(i) for i in range(n_classes)]
 
     metadata = {
         "dataset": dataset,
-        "n_samples": int(len(X_scaled)),
+        "n_samples": int(len(X_out)),
         "n_features": int(len(feature_names)),
         "n_classes": n_classes,
         "class_names": class_names,
@@ -873,7 +901,8 @@ def preprocess_dataset(
         "missing_strategy_continuous": strategy_continuous,
         "missing_strategy_categorical": strategy_categorical,
         "encoding": "onehot",
-        "scaling": "minmax",
+        "scaling": "minmax" if scaler is not None else "pending",
+        "skip_scaling": skip_scaling,
         "class_distribution": {
             int(k): int(v)
             for k, v in zip(
@@ -883,7 +912,7 @@ def preprocess_dataset(
     }
 
     # Save artifacts if directory specified
-    if artifacts_dir is not None:
+    if artifacts_dir is not None and scaler is not None:
         # Create a dummy LabelEncoder to satisfy the artifact
         # bundle — encoding was done via integer mapping
         le = LabelEncoder()
@@ -898,9 +927,9 @@ def preprocess_dataset(
 
     logger.info(
         "Preprocessing complete — X: %s, y: %s, classes: %d.",
-        X_scaled.shape, y_array.shape, n_classes,
+        X_out.shape, y_array.shape, n_classes,
     )
-    return X_scaled, y_array, scaler, feature_names, metadata
+    return X_out, y_array, scaler, feature_names, metadata
 
 
 def preprocess_train_val_test(

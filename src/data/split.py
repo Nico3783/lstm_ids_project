@@ -732,3 +732,119 @@ def _log_split_summary(
         "Total", n_total, "100.0%", n_classes,
     )
     logger.info("-" * 60)
+
+
+# 2D Split for Leakage-Safe Pipeline
+
+def split_and_save_2d(
+    X: np.ndarray,
+    y: np.ndarray,
+    output_dir: Optional[Path] = None,
+    train_ratio: float = TRAIN_RATIO,
+    val_ratio: float = VAL_RATIO,
+    test_ratio: float = TEST_RATIO,
+    stratified: bool = True,
+    random_state: int = RANDOM_SEED,
+    dataset: str = "nsl_kdd",
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray,
+           np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Split 2-D feature arrays (before sequence building and
+    scaling) into train/val/test and save to disk.
+
+    This is the leakage-safe entry point: the scaler will be
+    fitted later on the training split only, and sequences are
+    built per-split to avoid train/val contamination from
+    overlapping windows.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        2-D feature array of shape ``(n_samples, n_features)``.
+    y : np.ndarray
+        1-D integer label array of shape ``(n_samples,)``.
+    output_dir : Path, optional
+    train_ratio, val_ratio, test_ratio : float
+    stratified : bool
+    random_state : int
+    dataset : str
+
+    Returns
+    -------
+    tuple of six np.ndarray
+        ``(X_train, X_val, X_test, y_train, y_val, y_test)``
+        All X arrays are 2-D (n_samples, n_features).
+    """
+    out_dir = Path(output_dir or PROCESSED_DATA_DIR)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("=" * 60)
+    logger.info("2D SPLIT (leakage-safe) — dataset: %s", dataset)
+    logger.info("=" * 60)
+    logger.info("Input shape: %s", X.shape)
+
+    _validate_ratios(train_ratio, val_ratio, test_ratio)
+
+    # Check stratification feasibility
+    effective_stratify = stratified
+    if stratified:
+        _, class_counts = np.unique(y, return_counts=True)
+        min_count = int(class_counts.min())
+        if min_count < 2:
+            logger.warning(
+                "Stratified split requires >=2 samples per class "
+                "(min=%d) -- falling back to non-stratified.",
+                min_count,
+            )
+            effective_stratify = False
+
+    # Step 1: split off test set
+    X_trainval, X_test, y_trainval, y_test = train_test_split(
+        X, y,
+        test_size=test_ratio,
+        random_state=random_state,
+        shuffle=True,
+        stratify=y if effective_stratify else None,
+    )
+
+    # Step 2: split trainval into train and validation
+    val_size_relative = val_ratio / (train_ratio + val_ratio)
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_trainval, y_trainval,
+        test_size=val_size_relative,
+        random_state=random_state,
+        shuffle=True,
+        stratify=y_trainval if effective_stratify else None,
+    )
+
+    del X, y, X_trainval, y_trainval
+    gc.collect()
+
+    # Validate label consistency
+    check_label_consistency(y_train, y_val, y_test)
+
+    # Save splits
+    from src.utils.constants import (
+        X_TRAIN_NPY, X_VAL_NPY, X_TEST_NPY,
+        Y_TRAIN_NPY, Y_VAL_NPY, Y_TEST_NPY,
+    )
+
+    for arr, name in [
+        (X_train, X_TRAIN_NPY), (X_val, X_VAL_NPY), (X_test, X_TEST_NPY),
+        (y_train, Y_TRAIN_NPY), (y_val, Y_VAL_NPY), (y_test, Y_TEST_NPY),
+    ]:
+        np.save(str(out_dir / name), arr)
+
+    logger.info("2D split saved to: %s", out_dir)
+    logger.info(
+        "  train: %s  val: %s  test: %s",
+        X_train.shape, X_val.shape, X_test.shape,
+    )
+
+    _log_split_summary(
+        X_train, X_val, X_test,
+        y_train, y_val, y_test,
+        int(len(np.unique(np.concatenate([y_train, y_val, y_test])))),
+    )
+
+    return X_train, X_val, X_test, y_train, y_val, y_test

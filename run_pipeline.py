@@ -65,7 +65,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from src.data.loaders import load_dataset
 from src.data.preprocessing import preprocess_dataset
 from src.data.sequence_builder import build_sequences, rebuild_sequences_from_flat
-from src.data.split import split_and_save
+from src.data.split import split_and_save, split_and_save_2d
 from src.evaluation.classification_report import generate_classification_report
 from src.evaluation.confusion_matrix import plot_confusion_matrix
 from src.evaluation.metrics import compute_metrics
@@ -173,7 +173,7 @@ def parse_args() -> argparse.Namespace:
 
     # Stage range control (for per-cell Colab execution)
     STAGE_LIST = [
-        "preprocessing", "sequence_build", "split_save",
+        "preprocessing", "split_save", "scale_sequences",
         "tuning", "baselines", "lstm_train",
         "evaluation", "visualization", "export",
     ]
@@ -465,11 +465,11 @@ def main() -> None:
         return preprocessed_arrays
 
     # =================================================================
-    # STAGE 1: Preprocessing
+    # STAGE 1: Preprocessing (leakage-safe: no scaling yet)
     # =================================================================
     if "preprocessing" in stages_to_run:
         pm.start_stage("preprocessing")
-        logger.info("━━━ Stage 1/9: Preprocessing ━━━")
+        logger.info("━━━ Stage 1/9: Preprocessing (2D, no scaling) ━━━")
 
         logger.info("Loading raw dataset: %s ...", args.dataset)
         df_raw, df_test_unused = load_dataset(args.dataset)
@@ -484,14 +484,15 @@ def main() -> None:
             indices.sort()
             df_raw = df_raw.iloc[indices].reset_index(drop=True)
             logger.info(
-                "Sub-sampled raw DataFrame %s → %s rows (%.1f%%)",
+                "Sub-sampled raw DataFrame %s -> %s rows (%.1f%%)",
                 f"{n_total:,}", f"{n_keep:,}", args.subsample * 100,
             )
             del indices
             gc.collect()
 
-        X_seq, y_labels, scaler, feature_names, metadata = preprocess_dataset(
-            df_raw, dataset=args.dataset
+        # skip_scaling=True: scaler fitted later on train split only
+        X_2d, y_labels, _scaler_unused, feature_names, metadata = preprocess_dataset(
+            df_raw, dataset=args.dataset, skip_scaling=True,
         )
 
         # Build a LabelEncoder from metadata for downstream compatibility
@@ -501,27 +502,23 @@ def main() -> None:
 
         n_classes = int(metadata["n_classes"])
         logger.info(
-            "After preprocessing — sequences: %s, classes: %d",
-            X_seq.shape, n_classes,
+            "After preprocessing — 2D array: %s, classes: %d",
+            X_2d.shape, n_classes,
         )
 
-        # Persist preprocessed arrays
+        # Persist 2D unscaled arrays
         preprocessed_dir.mkdir(parents=True, exist_ok=True)
-        np_save = __import__("numpy").save
-        np_save(str(preprocessed_dir / "X_sequences.npy"), X_seq)
-        np_save(str(preprocessed_dir / "y_labels.npy"), y_labels)
+        np.save(str(preprocessed_dir / "X_2d.npy"), X_2d)
+        np.save(str(preprocessed_dir / "y_labels.npy"), y_labels)
         import pickle as _pkl
         with open(preprocessed_dir / "label_encoder.pkl", "wb") as f:
             _pkl.dump(label_enc, f)
-        with open(preprocessed_dir / "scaler.pkl", "wb") as f:
-            _pkl.dump(scaler, f)
         with open(preprocessed_dir / "feature_names.pkl", "wb") as f:
             _pkl.dump(feature_names, f)
         preprocessed_arrays = {
-            "X_seq": X_seq,
+            "X_2d": X_2d,
             "y_labels": y_labels,
             "label_enc": label_enc,
-            "scaler": scaler,
             "n_classes": n_classes,
         }
 
@@ -530,35 +527,69 @@ def main() -> None:
             _json.dump({
                 "dataset": args.dataset,
                 "n_classes": n_classes,
-                "n_samples": int(X_seq.shape[0]),
-                "n_features": int(len(feature_names)),
-                "sequence_length": config.window_size,
+                "n_samples": int(X_2d.shape[0]),
+                "n_features": int(X_2d.shape[1]),
                 "class_names": label_enc.classes_.tolist(),
-                "note": "X_seq is 2D here; 3D sequences built in stage 2",
+                "skip_scaling": True,
+                "note": "2D unscaled array; scaler fitted in stage 3",
             }, f, indent=2)
 
         rm.stage_complete("preprocessing", metadata={
-            "n_samples": int(X_seq.shape[0]),
+            "n_samples": int(X_2d.shape[0]),
             "n_classes": n_classes,
         })
-        # Free raw DataFrame from memory — no longer needed
-        del df_raw, scaler, label_enc, feature_names
+        del df_raw, label_enc, feature_names
         pm.end_stage("preprocessing")
         gc.collect()
         logger.info("Preprocessing done.")
 
     # =================================================================
-    # STAGE 2: Sequence building (2D → 3D via sliding window)
+    # STAGE 2: Train/Val/Test split (2D, before scaling)
     # =================================================================
-    if "sequence_build" in stages_to_run:
-        pm.start_stage("sequence_build")
-        logger.info("━━━ Stage 2/9: Building sequences ━━━")
+    if "split_save" in stages_to_run:
+        pm.start_stage("split_save")
+        logger.info("━━━ Stage 2/9: Splitting 2D data ━━━")
 
-        # Load 2D preprocessed arrays from Stage 1
-        X_2d = np.load(str(preprocessed_dir / "X_sequences.npy"))
-        y_1d = np.load(str(preprocessed_dir / "y_labels.npy"))
-        logger.info("Loaded 2D data: X=%s  y=%s", X_2d.shape, y_1d.shape)
+        X_2d = np.load(str(preprocessed_dir / "X_2d.npy"))
+        y_labels = np.load(str(preprocessed_dir / "y_labels.npy"))
+        logger.info("Loaded 2D data: X=%s  y=%s", X_2d.shape, y_labels.shape)
 
+        X_train, X_val, X_test, y_train, y_val, y_test = split_and_save_2d(
+            X=X_2d, y=y_labels,
+            output_dir=preprocessed_dir,
+            random_state=args.seed,
+            dataset=args.dataset,
+        )
+        logger.info(
+            "Split — train: %s, val: %s, test: %s",
+            X_train.shape, X_val.shape, X_test.shape,
+        )
+
+        rm.stage_complete("split_save", metadata={
+            "train_shape": list(X_train.shape),
+            "val_shape": list(X_val.shape),
+            "test_shape": list(X_test.shape),
+        })
+        del X_2d, y_labels, X_train, X_val, X_test, y_train, y_val, y_test
+        if preprocessed_arrays is not None:
+            preprocessed_arrays.clear()
+            preprocessed_arrays = None
+        pm.end_stage("split_save")
+        gc.collect()
+        logger.info("Data split done.")
+
+    # =================================================================
+    # STAGE 3: Scale per-split + build 3D sequences (leakage-safe)
+    # =================================================================
+    if "scale_sequences" in stages_to_run:
+        pm.start_stage("scale_sequences")
+        logger.info("━━━ Stage 3/9: Scale + sequences (per-split) ━━━")
+
+        from src.data.preprocessing import fit_scaler, apply_scaler
+        from src.utils.constants import (
+            X_TRAIN_NPY, X_VAL_NPY, X_TEST_NPY,
+            Y_TRAIN_NPY, Y_VAL_NPY, Y_TEST_NPY,
+        )
         window_size = config.window_size
         step_size = config.sequence.step_size
         label_position = config.sequence.label_position
@@ -567,53 +598,94 @@ def main() -> None:
             window_size, step_size, label_position,
         )
 
-        X_seq_3d, y_seq = build_sequences(
-            X_2d, y_1d,
-            window_size=window_size,
-            step_size=step_size,
-            label_position=label_position,
+        def _scale_and_build(split_label, x_npy, y_npy, scaler_path):
+            """Load 2D split, fit/apply scaler, build sequences, save 3D."""
+            X_2d = np.load(str(preprocessed_dir / x_npy))
+            y_1d = np.load(str(preprocessed_dir / y_npy))
+            logger.info(
+                "[%s] Loaded 2D: X=%s y=%s", split_label, X_2d.shape, y_1d.shape,
+            )
+
+            if split_label == "train":
+                scaler = fit_scaler(
+                    pd.DataFrame(X_2d),
+                    feature_range=(0, 1),
+                )
+                import pickle as _pkl
+                with open(preprocessed_dir / scaler_path, "wb") as f:
+                    _pkl.dump(scaler, f)
+                logger.info("[%s] Scaler fitted on training data.", split_label)
+            else:
+                import pickle as _pkl
+                with open(preprocessed_dir / scaler_path, "rb") as f:
+                    scaler = _pkl.load(f)
+                logger.info("[%s] Loaded training scaler.", split_label)
+
+            X_scaled = apply_scaler(pd.DataFrame(X_2d), scaler)
+
+            X_seq, y_seq = build_sequences(
+                X_scaled, y_1d,
+                window_size=window_size,
+                step_size=step_size,
+                label_position=label_position,
+            )
+            logger.info(
+                "[%s] 3D sequences: X=%s y=%s",
+                split_label, X_seq.shape, y_seq.shape,
+            )
+            return X_seq, y_seq
+
+        # Process train (fits scaler), then val/test (load same scaler)
+        X_train_seq, y_train_seq = _scale_and_build(
+            "train", X_TRAIN_NPY, Y_TRAIN_NPY, "scaler.pkl",
         )
-        logger.info(
-            "Sequences built — X: %s  y: %s  (from %d samples → %d sequences)",
-            X_seq_3d.shape, y_seq.shape, X_2d.shape[0], X_seq_3d.shape[0],
+        X_val_seq, y_val_seq = _scale_and_build(
+            "val", X_VAL_NPY, Y_VAL_NPY, "scaler.pkl",
+        )
+        X_test_seq, y_test_seq = _scale_and_build(
+            "test", X_TEST_NPY, Y_TEST_NPY, "scaler.pkl",
         )
 
-        # Overwrite with 3D sequences
-        np.save(str(preprocessed_dir / "X_sequences.npy"), X_seq_3d)
-        np.save(str(preprocessed_dir / "y_labels.npy"), y_seq)
+        # Overwrite split files with 3D sequences
+        np.save(str(preprocessed_dir / X_TRAIN_NPY), X_train_seq)
+        np.save(str(preprocessed_dir / Y_TRAIN_NPY), y_train_seq)
+        np.save(str(preprocessed_dir / X_VAL_NPY), X_val_seq)
+        np.save(str(preprocessed_dir / Y_VAL_NPY), y_val_seq)
+        np.save(str(preprocessed_dir / X_TEST_NPY), X_test_seq)
+        np.save(str(preprocessed_dir / Y_TEST_NPY), y_test_seq)
 
-        # Update metadata with 3D shape info
+        # Clean up 2D intermediates
+        for f in ["X_2d.npy"]:
+            p = preprocessed_dir / f
+            if p.exists():
+                p.unlink()
+
+        # Update metadata
         import json as _json
         meta_path = preprocessed_dir / "metadata.json"
         if meta_path.exists():
             with open(meta_path) as f:
                 meta = _json.load(f)
-            meta["sequence_length"] = window_size
-            meta["n_sequences"] = int(X_seq_3d.shape[0])
-            meta["sequence_shape_3d"] = list(X_seq_3d.shape)
-            with open(meta_path, "w") as f:
-                _json.dump(meta, f, indent=2)
+        else:
+            meta = {}
+        meta["skip_scaling"] = False
+        meta["sequence_length"] = window_size
+        meta["n_sequences_train"] = int(X_train_seq.shape[0])
+        meta["n_sequences_val"] = int(X_val_seq.shape[0])
+        meta["n_sequences_test"] = int(X_test_seq.shape[0])
+        meta["sequence_shape_3d_train"] = list(X_train_seq.shape)
+        with open(meta_path, "w") as f:
+            _json.dump(meta, f, indent=2)
 
-        # Update in-memory cache for downstream stages
-        n_classes = int(np.max(y_seq)) + 1
-        if meta_path.exists():
-            with open(meta_path) as f:
-                _meta_check = _json.load(f)
-            n_classes = _meta_check.get("n_classes", n_classes)
-        preprocessed_arrays = {
-            "X_seq": X_seq_3d,
-            "y_labels": y_seq,
-            "n_classes": n_classes,
-        }
-
-        del X_2d, y_1d
-        rm.stage_complete("sequence_build", metadata={
-            "n_sequences": int(X_seq_3d.shape[0]),
-            "window_size": window_size,
+        rm.stage_complete("scale_sequences", metadata={
+            "train_shape": list(X_train_seq.shape),
+            "val_shape": list(X_val_seq.shape),
+            "test_shape": list(X_test_seq.shape),
         })
-        pm.end_stage("sequence_build")
+        del X_train_seq, X_val_seq, X_test_seq, y_train_seq, y_val_seq, y_test_seq
+        pm.end_stage("scale_sequences")
         gc.collect()
-        logger.info("Sequence build done.")
+        logger.info("Scale + sequences done.")
 
     # =================================================================
     # Load split data lazily — only when a stage that needs it starts.
@@ -648,19 +720,22 @@ def main() -> None:
     # run, prepend them automatically instead of crashing.
     needs_splits = stages_needing_splits & set(stages_to_run)
     if needs_splits:
-        # Checkpoint markers are stored in the dataset root, not preprocessed dir
         root_done_dir = dirs["root"] / ".checkpoints"
         preproc_marker = root_done_dir / "preprocessing.done"
-        seq_marker = root_done_dir / "sequence_build.done"
+        split_marker = root_done_dir / "split_save.done"
+        scale_marker = root_done_dir / "scale_sequences.done"
         x_train_exists = (preprocessed_dir / "X_train.npy").exists()
 
         missing = []
         if not preproc_marker.exists():
             missing.append("preprocessing")
-        if not seq_marker.exists():
-            missing.append("sequence_build")
-        if not x_train_exists:
+        if not split_marker.exists():
             missing.append("split_save")
+        if not scale_marker.exists():
+            missing.append("scale_sequences")
+        if not x_train_exists:
+            if "scale_sequences" not in missing:
+                missing.append("scale_sequences")
 
         if missing:
             logger.warning(
@@ -684,48 +759,6 @@ def main() -> None:
             logger.info("No training stages requested. n_classes=%d", n_classes)
         else:
             logger.info("No training stages requested.")
-
-    # =================================================================
-    # STAGE 3: Train/Val/Test split
-    # =================================================================
-    if "split_save" in stages_to_run:
-        pm.start_stage("split_save")
-        logger.info("━━━ Stage 3/9: Splitting data ━━━")
-
-        # Load y_labels (small) and pass X file path directly
-        # to avoid loading the 7.5 GB array into RAM
-        y_labels = np.load(str(preprocessed_dir / "y_labels.npy"))
-        x_npy_path = str(preprocessed_dir / "X_sequences.npy")
-
-        # Split — pass x_path to skip loading into RAM
-        X_train, X_val, X_test, y_train, y_val, y_test = (
-            split_and_save(
-                y=y_labels,
-                output_dir=preprocessed_dir,
-                random_state=args.seed,
-                dataset=args.dataset,
-                x_path=x_npy_path,
-            )
-        )
-        logger.info(
-            "Split — train: %s, val: %s, test: %s",
-            X_train.shape, X_val.shape, X_test.shape,
-        )
-
-        rm.stage_complete("split_save", metadata={
-            "train_shape": list(X_train.shape),
-            "val_shape": list(X_val.shape),
-            "test_shape": list(X_test.shape),
-        })
-        # Free all split arrays — they're saved to disk; loaded lazily later
-        del X_train, X_val, X_test, y_train, y_val, y_test
-        del y_labels
-        if preprocessed_arrays is not None:
-            preprocessed_arrays.clear()
-            preprocessed_arrays = None
-        pm.end_stage("split_save")
-        gc.collect()
-        logger.info("Data split done.")
 
     # =================================================================
     # STAGE 4: Hyperparameter tuning (optional)

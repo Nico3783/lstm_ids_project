@@ -17,8 +17,8 @@ class CheckpointManager:
 
     STAGES: List[str] = [
         "preprocessing",
-        "sequence_build",
         "split_save",
+        "scale_sequences",
         "tuning",
         "baselines",
         "lstm_train",
@@ -122,15 +122,15 @@ class CheckpointManager:
     def _artifact_dirs(self, stage: str) -> List[Path]:
         """Directories to search for artifacts of a given stage."""
         mapping: Dict[str, List[str]] = {
-            "preprocessing": ["preprocessed"],
-            "sequence_build": ["preprocessed"],
-            "split_save":     ["preprocessed"],
-            "tuning":         ["config"],
-            "baselines":      ["models/baselines"],
-            "lstm_train":     ["models/final"],
-            "evaluation":     ["tables", "metrics"],
-            "visualization":  ["figures"],
-            "export":         ["exported"],
+            "preprocessing":    ["preprocessed"],
+            "split_save":       ["preprocessed"],
+            "scale_sequences":  ["preprocessed"],
+            "tuning":           ["config"],
+            "baselines":        ["models/baselines"],
+            "lstm_train":       ["models/final"],
+            "evaluation":       ["tables", "metrics"],
+            "visualization":    ["figures"],
+            "export":           ["exported"],
         }
         dirs = [self.dataset_dir]
         for sub in mapping.get(stage, []):
@@ -144,17 +144,20 @@ class CheckpointManager:
         """
         artifacts: Dict[str, List[str]] = {
             "preprocessing": [
-                "preprocessed/X_sequences.npy",
+                "preprocessed/X_2d.npy",
                 "preprocessed/y_labels.npy",
                 "preprocessed/label_encoder.pkl",
-                "preprocessed/scaler.pkl",
                 "preprocessed/feature_names.pkl",
             ],
-            "sequence_build": [
-                "preprocessed/X_sequences.npy",
-                "preprocessed/y_labels.npy",
-            ],
             "split_save": [
+                "preprocessed/X_train.npy",
+                "preprocessed/X_val.npy",
+                "preprocessed/X_test.npy",
+                "preprocessed/y_train.npy",
+                "preprocessed/y_val.npy",
+                "preprocessed/y_test.npy",
+            ],
+            "scale_sequences": [
                 "preprocessed/X_train.npy",
                 "preprocessed/X_val.npy",
                 "preprocessed/X_test.npy",

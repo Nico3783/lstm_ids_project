@@ -227,6 +227,44 @@ UNSW_NB15_ATTACK_CATEGORIES: List[str] = [
     "Worms",
 ]
 
+# Coarse-grained class grouping for UNSW-NB15
+# Maps 10 fine-grained classes → 6 broader categories
+# NOTE: map_unsw_nb15_labels() sorts alphabetically with "normal" forced to 0,
+# so numeric indices are: 0=normal, 1=analysis, 2=backdoors, 3=dos,
+# 4=exploits, 5=fuzzers, 6=generic, 7=reconnaissance, 8=shellcode, 9=worms.
+# Grouping rationale (based on actual indices):
+#   0 (Normal)      → 0 Normal
+#   1 (Analysis)    → 1 Fuzzers   — port scan / traffic analysis
+#   2 (Backdoors)   → 2 Exploits  — unauthorized access
+#   3 (DoS)         → 3 DoS       — denial of service
+#   4 (Exploits)    → 2 Exploits  — code execution
+#   5 (Fuzzers)     → 1 Fuzzers   — input fuzzing
+#   6 (Generic)     → 4 Generic   — benign-like bulk traffic
+#   7 (Recon)       → 5 Recon     — network reconnaissance
+#   8 (Shellcode)   → 2 Exploits  — code execution
+#   9 (Worms)       → 2 Exploits  — self-propagating
+UNSW_NB15_COARSE_MAPPING: Dict[int, int] = {
+    0: 0,   # Normal → Normal
+    1: 1,   # Analysis → Fuzzers
+    2: 2,   # Backdoors → Exploits
+    3: 3,   # DoS → DoS
+    4: 2,   # Exploits → Exploits
+    5: 1,   # Fuzzers → Fuzzers
+    6: 4,   # Generic → Generic
+    7: 5,   # Reconnaissance → Recon
+    8: 2,   # Shellcode → Exploits
+    9: 2,   # Worms → Exploits
+}
+
+UNSW_NB15_COARSE_CLASS_NAMES: List[str] = [
+    "Normal",
+    "Fuzzers",
+    "Exploits",
+    "DoS",
+    "Generic",
+    "Reconnaissance",
+]
+
 UNSW_NB15_CATEGORICAL_FEATURES: List[str] = [
     "proto",
     "service",

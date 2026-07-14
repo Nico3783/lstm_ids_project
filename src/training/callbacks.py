@@ -312,7 +312,7 @@ def build_callbacks(
 
     # 7. Periodic Checkpoint (every N epochs regardless of val_loss)
     if enable_periodic_checkpoint and checkpoint_path is not None:
-        _pc_out = checkpoint_path.parent.parent  # models/checkpoints/ → models/ → root
+        _pc_out = checkpoint_path.parent.parent.parent  # models/checkpoints/best_model.keras → models/checkpoints/ → models/ → dataset root
         callbacks.append(PeriodicCheckpoint(
             output_dir=_pc_out,
             save_every=periodic_checkpoint_every,
